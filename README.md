@@ -38,6 +38,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 
 🖥 실행 방법 (팀원용)
+
 1️⃣ 프로젝트 다운로드
 git clone https://github.com/boseong5712/ai-resume.git
 cd ai-resume
