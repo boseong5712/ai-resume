@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { onAuthStateChanged, signOut, type User as FirebaseUser } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
@@ -19,41 +19,73 @@ export default function ToolsLayout({ children }: { children: React.ReactNode })
     const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null)
     const [userProfile, setUserProfile] = useState<{ uid: string; name: string; email: string } | null>(null)
     const [authLoading, setAuthLoading] = useState(true)
+    const router = useRouter()
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            try {
-                if (!user) {
-                    setCurrentUser(null)
+        const timer = setTimeout(() => {
+            setAuthLoading(false)
+        }, 3000)
+
+        const unsubscribe = onAuthStateChanged(
+            auth,
+            async (user) => {
+                try {
+                    if (!user) {
+                        setCurrentUser(null)
+                        setUserProfile(null)
+                        return
+                    }
+
+                    setCurrentUser(user)
+
+                    const userSnap = await getDoc(doc(db, "users", user.uid))
+
+                    if (userSnap.exists()) {
+                        const data = userSnap.data() as {
+                            uid: string
+                            name: string
+                            email: string
+                        }
+                        setUserProfile(data)
+                    } else {
+                        setUserProfile({
+                            uid: user.uid,
+                            name: "",
+                            email: user.email ?? "",
+                        })
+                    }
+                } catch (error) {
+                    console.error("사용자 정보 불러오기 실패:", error)
                     setUserProfile(null)
+                } finally {
+                    clearTimeout(timer)
                     setAuthLoading(false)
-                    return
                 }
-
-                setCurrentUser(user)
-                const userSnap = await getDoc(doc(db, "users", user.uid))
-
-                if (userSnap.exists()) {
-                    const data = userSnap.data() as { uid: string; name: string; email: string }
-                    setUserProfile(data)
-                } else {
-                    setUserProfile({ uid: user.uid, name: "", email: user.email ?? "" })
-                }
-            } catch (error) {
-                console.error("사용자 정보 불러오기 실패:", error)
-            } finally {
+            },
+            (error) => {
+                console.error("Auth 상태 확인 실패:", error)
+                clearTimeout(timer)
                 setAuthLoading(false)
             }
-        })
+        )
 
-        return () => unsubscribe()
+        return () => {
+            clearTimeout(timer)
+            unsubscribe()
+        }
     }, [])
 
     const handleLogout = async () => {
         try {
             await signOut(auth)
+
+            localStorage.removeItem("resumeData")
+            localStorage.removeItem("savedResume")
+
             setUserProfile(null)
             setCurrentUser(null)
+
+            window.location.href = "/tools/resume-builder"
         } catch (error) {
             console.error("로그아웃 실패:", error)
         }

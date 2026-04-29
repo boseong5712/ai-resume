@@ -34,7 +34,7 @@ export default function LoginPage() {
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-slate-200 to-blue-300">
             <div className="w-full max-w-md rounded-3xl bg-white p-10 shadow-xl">
                 <div className="text-center">
-                    <h1 className="text-4xl font-extrabold text-blue-600">JOBMAKER</h1>
+                    <h1 className="text-4xl font-extrabold text-blue-600">자소서메이커</h1>
                     <p className="mt-4 text-sm text-slate-500">
                         AI 기반 취업 플랫폼에 오신 것을 환영합니다
                     </p>

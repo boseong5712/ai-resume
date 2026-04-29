@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import {
     User,
@@ -386,6 +387,7 @@ export default function ResumeBuilderPage() {
         phone: "",
         school: "",
         company: "",
+        photoUrl: "",
         skills: [] as string[],
         education: [] as EducationItem[],
         career: [] as CareerItem[],
@@ -408,13 +410,29 @@ export default function ResumeBuilderPage() {
         useState<number | null>(null)
 
     const [previewModalOpen, setPreviewModalOpen] = useState(false)
-    const [viewMode, setViewMode] = useState<"edit" | "preview">("edit")
 
     useEffect(() => {
+        const editingResumeId = localStorage.getItem("editingResumeId")
+        const savedResumes = JSON.parse(localStorage.getItem("savedResumes") || "[]")
+
+        if (editingResumeId) {
+            const targetResume = savedResumes.find(
+                (resume: any) => resume.id === editingResumeId
+            )
+
+            if (targetResume) {
+                setFormData(targetResume.data)
+                setIsMounted(true)
+                return
+            }
+        }
+
         const saved = localStorage.getItem("resumeData")
+
         if (saved) {
             setFormData(JSON.parse(saved))
         }
+
         setIsMounted(true)
     }, [])
 
@@ -423,30 +441,68 @@ export default function ResumeBuilderPage() {
         localStorage.setItem("resumeData", JSON.stringify(formData))
     }, [formData, isMounted])
 
+    useEffect(() => {
+        const handleUnload = () => {
+            localStorage.removeItem("resumeData")
+            localStorage.removeItem("savedResume")
+        }
+
+        window.addEventListener("beforeunload", handleUnload)
+
+        return () => {
+            window.removeEventListener("beforeunload", handleUnload)
+        }
+    }, [])
+
     const progress = useMemo(() => {
         if (!isMounted) return 0
 
         let score = 0
 
-        if (formData.resumeTitle.trim()) score += 10
-
-        if (formData.name.trim()) score += 20
-        if (formData.email.trim()) score += 20
+        // 기본정보 최대 50
+        if (formData.resumeTitle?.trim()) score += 10
+        if (formData.name.trim()) score += 15
+        if (formData.email.trim()) score += 15
         if (formData.phone.trim()) score += 10
 
-        if (formData.education.length > 0) score += 20
-        if (formData.education.some((edu) => edu.schoolName.trim())) score += 20
-        if (formData.education.some((edu) => edu.major.trim())) score += 10
+        // 학력 최대 40
+        formData.education.forEach((edu) => {
+            if (edu.schoolName.trim()) score += 10
+            if (edu.major.trim()) score += 10
+            if (edu.degree.trim()) score += 5
+            if (edu.status.trim()) score += 5
+            if (edu.admissionDate.trim()) score += 5
+            if (edu.graduationDate.trim()) score += 5
+        })
 
-        if (formData.career.length > 0) score += 20
-        if (formData.career.some((career) => career.companyName.trim())) score += 20
+        // 경력 최대 40
+        formData.career.forEach((career) => {
+            if (career.companyName.trim()) score += 10
+            if (career.position.trim()) score += 10
+            if (career.startDate.trim()) score += 5
+            if (career.endDate.trim() || career.isCurrent) score += 5
+            if (career.description.trim()) score += 10
+        })
 
-        if (formData.skillGroups.length > 0) score += 20
-        if (formData.skillGroups.some((group) => group.category.trim())) score += 10
-        if (formData.skillGroups.some((group) => group.skills.length > 0)) score += 20
+        // 보유기술 최대 40
+        formData.skillGroups.forEach((group) => {
+            if (group.category.trim()) score += 15
+            if (group.skills.length > 0) score += 25
+        })
 
-        if (formData.certificates.length > 0) score += 10
-        if (formData.awards.length > 0) score += 10
+        // 자격증 최대 15
+        formData.certificates.forEach((cert) => {
+            if (cert.name.trim()) score += 5
+            if (cert.issuer.trim()) score += 5
+            if (cert.acquiredDate.trim()) score += 5
+        })
+
+        // 수상경력 최대 15
+        formData.awards.forEach((award) => {
+            if (award.title.trim()) score += 5
+            if (award.organization.trim()) score += 5
+            if (award.date.trim()) score += 5
+        })
 
         return Math.min(score, 200)
     }, [formData, isMounted])
@@ -714,6 +770,22 @@ export default function ResumeBuilderPage() {
         alert("임시저장되었습니다.")
     }
 
+    const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        const reader = new FileReader()
+
+        reader.onload = () => {
+            setFormData((prev) => ({
+                ...prev,
+                photoUrl: reader.result as string,
+            }))
+        }
+
+        reader.readAsDataURL(file)
+    }
+
     const handlePreview = () => {
         setPreviewModalOpen(true)
     }
@@ -721,7 +793,7 @@ export default function ResumeBuilderPage() {
     const confirmPreview = () => {
         localStorage.setItem("resumeData", JSON.stringify(formData))
         setPreviewModalOpen(false)
-        setViewMode("preview")
+        router.push("/tools/resume-builder/preview")
     }
 
     const handleSaveResume = () => {
@@ -731,1492 +803,1329 @@ export default function ResumeBuilderPage() {
 
         if (!ok) return
 
-        localStorage.setItem("savedResume", JSON.stringify(formData))
-        window.location.href = "/my-info"
+        const savedResumes = JSON.parse(
+            localStorage.getItem("savedResumes") || "[]"
+        )
+
+        const editingResumeId = localStorage.getItem("editingResumeId")
+
+        const now = new Date().toISOString()
+
+        if (editingResumeId) {
+            const updatedResumes = savedResumes.map((resume: any) =>
+                resume.id === editingResumeId
+                    ? {
+                        ...resume,
+                        title: formData.resumeTitle || formData.name || "제목 없는 이력서",
+                        data: formData,
+                        updatedAt: now,
+                    }
+                    : resume
+            )
+
+            localStorage.setItem("savedResumes", JSON.stringify(updatedResumes))
+            localStorage.removeItem("editingResumeId")
+        } else {
+            const newResume = {
+                id: crypto.randomUUID(),
+                title: formData.resumeTitle || formData.name || "제목 없는 이력서",
+                data: formData,
+                createdAt: now,
+                updatedAt: now,
+                isMain: false,
+            }
+
+            localStorage.setItem(
+                "savedResumes",
+                JSON.stringify([newResume, ...savedResumes])
+            )
+        }
+
+        localStorage.removeItem("resumeData")
+        window.location.href = "/tools/mypage/save-builder-resume"
     }
+
+    const resetResumeForm = () => {
+        localStorage.removeItem("resumeData")
+        localStorage.removeItem("savedResume")
+
+        setFormData(defaultFormData)
+
+        setActiveTab("기본정보")
+        setPreviewModalOpen(false)
+    }
+
+    const router = useRouter()
 
     return (
         <div className="relative min-h-screen">
-            {viewMode === "preview" ? (
-                <div className="min-h-screen bg-slate-100">
-                    <div className="sticky top-0 z-40 border-b bg-white">
-                        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+            <div className="max-w-5xl mx-auto space-y-6">
+                <Card className="rounded-2xl border border-slate-200 shadow-sm">
+                    <CardContent className="p-7">
+                        <div className="flex items-start justify-between gap-6">
                             <div>
-                                <h1 className="text-xl font-bold text-slate-900">
-                                    이력서 미리보기
-                                </h1>
-                                <p className="text-sm text-slate-500">
-                                    템플릿과 설정을 확인한 후 저장하세요
+                                <h2 className="text-3xl font-bold text-slate-900">이력서 작성</h2>
+                                <p className="mt-3 text-sm text-slate-500">
+                                    단계별로 차근차근 완성해보세요
                                 </p>
                             </div>
 
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    type="button"
-                                    onClick={() => setViewMode("edit")}
-                                >
-                                    ← 되돌아가기
-                                </Button>
-
-                                <Button
-                                    type="button"
-                                    className="bg-emerald-500 text-white hover:bg-emerald-600"
-                                    onClick={handleSaveResume}
-                                >
-                                    저장하기
-                                </Button>
-
-                                <Button
-                                    type="button"
-                                    className="bg-red-500 text-white hover:bg-red-600"
-                                >
-                                    고품질 PDF
-                                </Button>
-
-                                <Button variant="outline" type="button">
-                                    워드 내보내기
-                                </Button>
-
-                                <Button variant="outline" type="button" disabled>
-                                    브라우저 인쇄
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="mx-auto max-w-5xl px-6 py-6">
-                        <div className="mb-6 grid grid-cols-3 gap-4 rounded-xl border bg-white p-4">
-                            <div className="rounded-lg border p-4">
-                                <div className="text-xs text-slate-400">템플릿</div>
-                                <div className="mt-1 font-semibold">모던</div>
-                            </div>
-
-                            <div className="rounded-lg border p-4">
-                                <div className="text-xs text-slate-400">색상</div>
-                                <div className="mt-1 flex items-center gap-2 font-semibold">
-                                    <span className="h-3 w-3 rounded-full bg-blue-600" />
-                                    블루
-                                </div>
-                            </div>
-
-                            <div className="rounded-lg border p-4">
-                                <div className="text-xs text-slate-400">글꼴</div>
-                                <div className="mt-1 font-semibold">모던</div>
-                            </div>
-                        </div>
-
-                        <div className="rounded-xl bg-slate-200 p-8">
-                            <div className="space-y-6">
-                                <section className="rounded-2xl bg-white p-8 shadow-sm">
-                                    <div className="flex justify-between">
-                                        <div>
-                                            <h2 className="text-5xl font-bold text-blue-600">
-                                                {formData.name || "이름 미입력"}
-                                            </h2>
-                                            <div className="mt-4 h-1 w-20 bg-blue-600" />
-                                            <p className="mt-4 text-sm text-slate-600">
-                                                {formData.email} · {formData.phone}
-                                            </p>
-                                        </div>
-
-                                        <div className="text-xs text-slate-400">
-                                            이미지 없음
-                                        </div>
+                            <div className="flex gap-3">
+                                <div className="flex h-[74px] w-[118px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+                                    <div className="text-3xl font-bold text-blue-600">
+                                        {progress}%
                                     </div>
-                                </section>
-
-                                <section className="rounded-2xl bg-white p-8 shadow-sm">
-                                    <h3 className="mb-5 text-2xl font-bold text-blue-600 underline">
-                                        교육
-                                    </h3>
-
-                                    {formData.education.length === 0 ? (
-                                        <p className="text-sm text-slate-400">입력된 학력이 없습니다.</p>
-                                    ) : (
-                                        formData.education.map((edu, index) => (
-                                            <div key={index} className="mb-4">
-                                                <div className="font-bold">
-                                                    {edu.schoolName}
-                                                    <span className="ml-2 rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-600">
-                                                        {edu.admissionDate} - {edu.graduationDate || "현재"}
-                                                    </span>
-                                                </div>
-                                                <div className="mt-1 text-slate-700">{edu.major}</div>
-                                                <div className="mt-1 text-sm text-slate-500">{edu.status}</div>
-                                            </div>
-                                        ))
-                                    )}
-                                </section>
-
-                                <section className="rounded-2xl bg-white p-8 shadow-sm">
-                                    <h3 className="mb-5 text-2xl font-bold text-blue-600 underline">
-                                        경력
-                                    </h3>
-
-                                    {formData.career.length === 0 ? (
-                                        <p className="text-sm text-slate-400">입력된 경력이 없습니다.</p>
-                                    ) : (
-                                        formData.career.map((career, index) => (
-                                            <div key={index} className="mb-4">
-                                                <div className="font-bold">
-                                                    {career.companyName}
-                                                    <span className="ml-2 rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-600">
-                                                        {career.startDate} -{" "}
-                                                        {career.isCurrent ? "현재" : career.endDate}
-                                                    </span>
-                                                </div>
-                                                <div className="mt-1 text-slate-700">{career.position}</div>
-                                                <p className="mt-2 text-sm text-slate-500">
-                                                    {career.description}
-                                                </p>
-                                            </div>
-                                        ))
-                                    )}
-                                </section>
-
-                                <section className="rounded-2xl bg-white p-8 shadow-sm">
-                                    <h3 className="mb-5 text-2xl font-bold text-blue-600 underline">
-                                        기술
-                                    </h3>
-
-                                    {formData.skillGroups.length === 0 ? (
-                                        <p className="text-sm text-slate-400">입력된 기술이 없습니다.</p>
-                                    ) : (
-                                        formData.skillGroups.map((group, index) => (
-                                            <div key={index} className="mb-4">
-                                                <div className="font-bold">{group.category}</div>
-                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                    {group.skills.map((skill) => (
-                                                        <span
-                                                            key={skill}
-                                                            className="rounded-full bg-blue-600 px-3 py-1 text-xs text-white"
-                                                        >
-                                                            {skill}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </section>
-
-                                <section className="rounded-2xl bg-white p-8 shadow-sm">
-                                    <h3 className="mb-5 text-2xl font-bold text-blue-600 underline">
-                                        자격증
-                                    </h3>
-
-                                    {formData.certificates.length === 0 ? (
-                                        <p className="text-sm text-slate-400">입력된 자격증이 없습니다.</p>
-                                    ) : (
-                                        formData.certificates.map((cert, index) => (
-                                            <div key={index} className="mb-4">
-                                                <div className="font-bold">
-                                                    {cert.name}
-                                                    {cert.grade && (
-                                                        <span className="ml-2 rounded-full bg-blue-600 px-2 py-1 text-xs text-white">
-                                                            {cert.grade}
-                                                        </span>
-                                                    )}
-                                                    <span className="ml-2 rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-600">
-                                                        {cert.acquiredDate}
-                                                    </span>
-                                                </div>
-                                                <div className="mt-1 text-slate-600">{cert.issuer}</div>
-                                            </div>
-                                        ))
-                                    )}
-                                </section>
-
-                                <section className="rounded-2xl bg-white p-8 shadow-sm">
-                                    <h3 className="mb-5 text-2xl font-bold text-blue-600 underline">
-                                        수상경력
-                                    </h3>
-
-                                    {formData.awards.length === 0 ? (
-                                        <p className="text-sm text-slate-400">입력된 수상경력이 없습니다.</p>
-                                    ) : (
-                                        formData.awards.map((award, index) => (
-                                            <div key={index} className="mb-4">
-                                                <div className="font-bold">
-                                                    {award.title}
-                                                    <span className="ml-2 rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-600">
-                                                        {award.date}
-                                                    </span>
-                                                </div>
-                                                <div className="mt-1 text-slate-600">
-                                                    {award.organization}
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </section>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                <>
-                <div className="max-w-5xl mx-auto space-y-6">
-                    <Card className="rounded-2xl border border-slate-200 shadow-sm">
-                        <CardContent className="p-7">
-                            <div className="flex items-start justify-between gap-6">
-                                <div>
-                                    <h2 className="text-3xl font-bold text-slate-900">이력서 작성</h2>
-                                    <p className="mt-3 text-sm text-slate-500">
-                                        단계별로 차근차근 완성해보세요
-                                    </p>
+                                    <div className="mt-1 text-xs text-slate-500">완성률</div>
                                 </div>
 
-                                <div className="flex gap-3">
-                                    <div className="flex h-[74px] w-[118px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
-                                        <div className="text-3xl font-bold text-blue-600">
-                                            {progress}%
-                                        </div>
-                                        <div className="mt-1 text-xs text-slate-500">완성률</div>
+                                <div className="flex h-[74px] w-[118px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+                                    <div className="text-lg font-bold text-slate-900">
+                                        {progress >= 100 ? "완성" : "작성중"}
                                     </div>
-
-                                    <div className="flex h-[74px] w-[118px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
-                                        <div className="text-lg font-bold text-slate-900">
-                                            {progress >= 100 ? "완성" : "작성중"}
-                                        </div>
-                                        <div className="mt-1 text-xs text-slate-500">진행상태</div>
-                                    </div>
+                                    <div className="mt-1 text-xs text-slate-500">진행상태</div>
                                 </div>
                             </div>
-                            <div className="mt-4 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-medium text-blue-600">
-                                이력서 제목&nbsp;
-                                <span className="font-bold">
-                                    {formData.resumeTitle || "미입력"}
-                                </span>
-                            </div>
-                            <div className="mt-8 h-2 w-full rounded-full bg-slate-200">
-                                <div
-                                    className="h-2 rounded-full bg-emerald-500 transition-all"
-                                    style={{ width: `${Math.min(progress / 2, 100)}%` }}
+                        </div>
+                        <div className="mt-4 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-medium text-blue-600">
+                            이력서 제목&nbsp;
+                            <span className="font-bold">
+                                {formData.resumeTitle || "미입력"}
+                            </span>
+                        </div>
+                        <div className="mt-8 h-2 w-full rounded-full bg-slate-200">
+                            <div
+                                className="h-2 rounded-full bg-emerald-500 transition-all"
+                                style={{ width: `${Math.min(progress / 2, 100)}%` }}
+                            />
+                        </div>
+
+                        <div className="mt-5 flex h-14 items-center justify-between rounded-xl border border-slate-200 bg-white px-5 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
+                                <span className="text-slate-400 text-lg">📄</span>
+
+                                <input
+                                    value={formData.resumeTitle}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            resumeTitle: e.target.value,
+                                        })
+                                    }
+                                    placeholder="이력서 제목을 입력해주세요"
+                                    maxLength={50}
+                                    className="w-full bg-transparent text-lg font-bold text-slate-900 outline-none placeholder:text-slate-400"
                                 />
                             </div>
 
-                            <div className="mt-5 flex h-14 items-center justify-between rounded-xl border border-slate-200 bg-white px-5 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
-                                <div className="flex min-w-0 flex-1 items-center gap-3">
-                                    <span className="text-slate-400 text-lg">📄</span>
+                            <div className="ml-4 shrink-0 rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-500">
+                                {formData.resumeTitle.length}/50
+                            </div>
+                        </div>
 
-                                    <input
-                                        value={formData.resumeTitle}
-                                        onChange={(e) =>
-                                            setFormData({
-                                                ...formData,
-                                                resumeTitle: e.target.value,
-                                            })
-                                        }
-                                        placeholder="이력서 제목을 입력해주세요"
-                                        maxLength={50}
-                                        className="w-full bg-transparent text-lg font-bold text-slate-900 outline-none placeholder:text-slate-400"
-                                    />
+                        {progress >= 100 && (
+                            <div className="mt-5 flex items-center gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white">
+                                    🎉
                                 </div>
 
-                                <div className="ml-4 shrink-0 rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-500">
-                                    {formData.resumeTitle.length}/50
+                                <div>
+                                    <div className="font-bold text-emerald-700">
+                                        축하합니다! 이력서가 거의 완성되었습니다.
+                                    </div>
+                                    <div className="mt-1 text-sm text-emerald-700">
+                                        이제 저장하고 활용해보세요!
+                                    </div>
                                 </div>
                             </div>
+                        )}
+                    </CardContent>
+                </Card>
+                
+                <Card>
+                    <CardContent className="p-4">
+                        <div className="flex flex-wrap gap-3">
+                            {tabs.map((tab) => {
+                                const isActive = activeTab === tab
 
-                            {progress >= 100 && (
-                                <div className="mt-5 flex items-center gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white">
-                                        🎉
+                                return (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveTab(tab)}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${isActive
+                                                ? "bg-blue-100 text-blue-600 font-medium"
+                                                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                            }`}
+                                    >
+                                        {iconMap[tab]}
+                                        {tab}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="min-h-[500px]">
+                    <CardContent className="p-6">
+                        {activeTab === "기본정보" && (
+                            <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-6">
+                                <div className="flex flex-col items-center">
+                                    <div className="w-32 h-40 overflow-hidden rounded-md border bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
+                                        {formData.photoUrl ? (
+                                            <img
+                                                src={formData.photoUrl}
+                                                alt="프로필 사진"
+                                                className="h-full w-full object-cover"
+                                            />
+                                        ) : (
+                                            "사진 추가"
+                                        )}
+                                    </div>
+
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handlePhotoUpload}
+                                    />
+                                    <Button
+                                        className="w-full mt-4"
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        사진 업로드
+                                    </Button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-sm font-medium">이름 *</label>
+                                        <Input
+                                            className="mt-2"
+                                            placeholder="이름을 입력하세요"
+                                            value={formData.name}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, name: e.target.value })
+                                            }
+                                        />
                                     </div>
 
                                     <div>
-                                        <div className="font-bold text-emerald-700">
-                                            축하합니다! 이력서가 거의 완성되었습니다.
-                                        </div>
-                                        <div className="mt-1 text-sm text-emerald-700">
-                                            이제 저장하고 활용해보세요!
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="flex flex-wrap gap-3">
-                                {tabs.map((tab) => {
-                                    const isActive = activeTab === tab
-
-                                    return (
-                                        <button
-                                            key={tab}
-                                            onClick={() => setActiveTab(tab)}
-                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${isActive
-                                                    ? "bg-blue-100 text-blue-600 font-medium"
-                                                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                                                }`}
-                                        >
-                                            {iconMap[tab]}
-                                            {tab}
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="min-h-[500px]">
-                        <CardContent className="p-6">
-                            {activeTab === "기본정보" && (
-                                <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-6">
-                                    <div className="flex flex-col items-center">
-                                        <div className="w-32 h-40 rounded-md border bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
-                                            사진 추가
-                                        </div>
-
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept="image/*"
-                                            className="hidden"
+                                        <label className="text-sm font-medium">이메일 *</label>
+                                        <Input
+                                            className="mt-2"
+                                            placeholder="이메일을 입력하세요"
+                                            value={formData.email}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, email: e.target.value })
+                                            }
                                         />
-
-                                        <Button
-                                            className="w-full mt-4"
-                                            type="button"
-                                            onClick={() => fileInputRef.current?.click()}
-                                        >
-                                            사진 업로드
-                                        </Button>
                                     </div>
 
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="text-sm font-medium">이름 *</label>
-                                            <Input
-                                                className="mt-2"
-                                                placeholder="이름을 입력하세요"
-                                                value={formData.name}
-                                                onChange={(e) =>
-                                                    setFormData({ ...formData, name: e.target.value })
-                                                }
-                                            />
-                                        </div>
+                                    <div>
+                                        <label className="text-sm font-medium">전화번호 *</label>
+                                        <Input
+                                            className="mt-2"
+                                            placeholder="전화번호를 입력하세요"
+                                            value={formData.phone}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, phone: e.target.value })
+                                            }
+                                        />
+                                    </div>
 
-                                        <div>
-                                            <label className="text-sm font-medium">이메일 *</label>
-                                            <Input
-                                                className="mt-2"
-                                                placeholder="이메일을 입력하세요"
-                                                value={formData.email}
-                                                onChange={(e) =>
-                                                    setFormData({ ...formData, email: e.target.value })
-                                                }
-                                            />
-                                        </div>
+                                    <div>
+                                        <label className="text-sm font-medium">주소</label>
+                                        <Input className="mt-2" placeholder="주소를 입력하세요" />
+                                    </div>
 
-                                        <div>
-                                            <label className="text-sm font-medium">전화번호 *</label>
-                                            <Input
-                                                className="mt-2"
-                                                placeholder="전화번호를 입력하세요"
-                                                value={formData.phone}
-                                                onChange={(e) =>
-                                                    setFormData({ ...formData, phone: e.target.value })
-                                                }
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="text-sm font-medium">주소</label>
-                                            <Input className="mt-2" placeholder="주소를 입력하세요" />
-                                        </div>
-
-                                        <div>
-                                            <label className="text-sm font-medium">생년월일 *</label>
-                                            <Input className="mt-2" type="date" />
-                                        </div>
+                                    <div>
+                                        <label className="text-sm font-medium">생년월일 *</label>
+                                        <Input className="mt-2" type="date" />
                                     </div>
                                 </div>
-                            )}
+                            </div>
+                        )}
 
-                            {activeTab === "학력사항" && (
-                                <Card className="rounded-2xl border border-slate-200 shadow-none">
-                                    <CardContent className="p-6">
-                                        <div className="mb-5">
-                                            <div className="flex items-center gap-2">
-                                                <GraduationCap className="h-4 w-4 text-sky-500" />
-                                                <h3 className="text-2xl font-bold tracking-tight text-slate-800">
-                                                    학력사항
-                                                </h3>
-                                            </div>
-                                            <p className="mt-2 text-sm text-slate-500">
-                                                학력사항을 시간순(최신순)으로 입력해주세요. 드래그하여 순서를 변경할 수 있습니다.
+                        {activeTab === "학력사항" && (
+                            <Card className="rounded-2xl border border-slate-200 shadow-none">
+                                <CardContent className="p-6">
+                                    <div className="mb-5">
+                                        <div className="flex items-center gap-2">
+                                            <GraduationCap className="h-4 w-4 text-sky-500" />
+                                            <h3 className="text-2xl font-bold tracking-tight text-slate-800">
+                                                학력사항
+                                            </h3>
+                                        </div>
+                                        <p className="mt-2 text-sm text-slate-500">
+                                            학력사항을 시간순(최신순)으로 입력해주세요.
+                                        </p>
+                                    </div>
+
+                                    {formData.education.length === 0 && (
+                                        <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-white text-center">
+                                            <GraduationCap className="mb-4 h-12 w-12 text-slate-300" />
+                                            <p className="text-xl font-semibold text-slate-700">
+                                                아직 학력사항이 없습니다
+                                            </p>
+                                            <p className="mt-2 text-sm text-slate-400">
+                                                첫 번째 학력을 추가해보세요
                                             </p>
                                         </div>
+                                    )}
 
-                                        {formData.education.length === 0 && (
-                                            <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-white text-center">
-                                                <GraduationCap className="mb-4 h-12 w-12 text-slate-300" />
-                                                <p className="text-xl font-semibold text-slate-700">
-                                                    아직 학력사항이 없습니다
-                                                </p>
-                                                <p className="mt-2 text-sm text-slate-400">
-                                                    첫 번째 학력을 추가해보세요
-                                                </p>
-                                            </div>
-                                        )}
-
-                                        {formData.education.length > 0 && (
-                                            <div className="space-y-5">
-                                                {formData.education.map((edu, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className="overflow-visible rounded-xl border border-slate-200 bg-white"
-                                                    >
-                                                        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="text-slate-400">⋮⋮</div>
-                                                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                                                                    <GraduationCap className="h-4 w-4 text-sky-500" />
-                                                                    학력 {index + 1}
-                                                                </div>
+                                    {formData.education.length > 0 && (
+                                        <div className="space-y-5">
+                                            {formData.education.map((edu, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="overflow-visible rounded-xl border border-slate-200 bg-white"
+                                                >
+                                                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="text-slate-400">⋮⋮</div>
+                                                            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                                                                <GraduationCap className="h-4 w-4 text-sky-500" />
+                                                                학력 {index + 1}
                                                             </div>
-
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeEducation(index)}
-                                                                className="text-sm text-slate-400 hover:text-red-500"
-                                                            >
-                                                                삭제
-                                                            </button>
                                                         </div>
 
-                                                        <div className="space-y-5 p-5">
-                                                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                                                <AutoCompleteInput
-                                                                    label="학교명"
-                                                                    required
-                                                                    placeholder="학교명을 입력하세요"
-                                                                    value={edu.schoolName}
-                                                                    options={SCHOOL_OPTIONS}
-                                                                    onChange={(value) =>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeEducation(index)}
+                                                            className="text-sm text-slate-400 hover:text-red-500"
+                                                        >
+                                                            삭제
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="space-y-5 p-5">
+                                                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                                            <AutoCompleteInput
+                                                                label="학교명"
+                                                                required
+                                                                placeholder="학교명을 입력하세요"
+                                                                value={edu.schoolName}
+                                                                options={SCHOOL_OPTIONS}
+                                                                onChange={(value) =>
+                                                                    updateEducationField(
+                                                                        index,
+                                                                        "schoolName",
+                                                                        value
+                                                                    )
+                                                                }
+                                                            />
+
+                                                            <AutoCompleteInput
+                                                                label="전공"
+                                                                required
+                                                                placeholder="전공을 입력하세요"
+                                                                value={edu.major}
+                                                                options={MAJOR_OPTIONS}
+                                                                onChange={(value) =>
+                                                                    updateEducationField(index, "major", value)
+                                                                }
+                                                            />
+                                                        </div>
+
+                                                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                                            <div>
+                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                    학위
+                                                                </label>
+                                                                <select
+                                                                    className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:ring-1 focus:ring-sky-500"
+                                                                    value={edu.degree}
+                                                                    onChange={(e) =>
                                                                         updateEducationField(
                                                                             index,
-                                                                            "schoolName",
-                                                                            value
+                                                                            "degree",
+                                                                            e.target.value
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    {DEGREE_OPTIONS.map((item) => (
+                                                                        <option key={item} value={item}>
+                                                                            {item}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                    상태
+                                                                </label>
+                                                                <select
+                                                                    className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:ring-1 focus:ring-sky-500"
+                                                                    value={edu.status}
+                                                                    onChange={(e) =>
+                                                                        updateEducationField(
+                                                                            index,
+                                                                            "status",
+                                                                            e.target.value
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    {STATUS_OPTIONS.map((item) => (
+                                                                        <option key={item} value={item}>
+                                                                            {item}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                학점(선택)
+                                                            </label>
+
+                                                            <div className="flex items-center gap-3">
+                                                                <Input
+                                                                    className="h-11 max-w-[220px] border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                    placeholder="3.8"
+                                                                    value={edu.gpa}
+                                                                    onChange={(e) =>
+                                                                        updateEducationField(
+                                                                            index,
+                                                                            "gpa",
+                                                                            e.target.value
                                                                         )
                                                                     }
                                                                 />
 
-                                                                <AutoCompleteInput
-                                                                    label="전공"
-                                                                    required
-                                                                    placeholder="전공을 입력하세요"
-                                                                    value={edu.major}
-                                                                    options={MAJOR_OPTIONS}
-                                                                    onChange={(value) =>
-                                                                        updateEducationField(index, "major", value)
-                                                                    }
-                                                                />
-                                                            </div>
+                                                                <span className="text-xl text-slate-400">
+                                                                    /
+                                                                </span>
 
-                                                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        학위
-                                                                    </label>
-                                                                    <select
-                                                                        className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:ring-1 focus:ring-sky-500"
-                                                                        value={edu.degree}
-                                                                        onChange={(e) =>
-                                                                            updateEducationField(
-                                                                                index,
-                                                                                "degree",
-                                                                                e.target.value
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        {DEGREE_OPTIONS.map((item) => (
-                                                                            <option key={item} value={item}>
-                                                                                {item}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </div>
-
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        상태
-                                                                    </label>
-                                                                    <select
-                                                                        className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:ring-1 focus:ring-sky-500"
-                                                                        value={edu.status}
-                                                                        onChange={(e) =>
-                                                                            updateEducationField(
-                                                                                index,
-                                                                                "status",
-                                                                                e.target.value
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        {STATUS_OPTIONS.map((item) => (
-                                                                            <option key={item} value={item}>
-                                                                                {item}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-
-                                                            <div>
-                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                    학점(선택)
-                                                                </label>
-
-                                                                <div className="flex items-center gap-3">
-                                                                    <Input
-                                                                        className="h-11 max-w-[220px] border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        placeholder="3.8"
-                                                                        value={edu.gpa}
-                                                                        onChange={(e) =>
-                                                                            updateEducationField(
-                                                                                index,
-                                                                                "gpa",
-                                                                                e.target.value
-                                                                            )
-                                                                        }
-                                                                    />
-
-                                                                    <span className="text-xl text-slate-400">
-                                                                        /
-                                                                    </span>
-
-                                                                    <select
-                                                                        className="h-11 min-w-[92px] rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:ring-1 focus:ring-sky-500"
-                                                                        value={edu.gpaScale}
-                                                                        onChange={(e) =>
-                                                                            updateEducationField(
-                                                                                index,
-                                                                                "gpaScale",
-                                                                                e.target.value
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        {GPA_SCALE_OPTIONS.map((item) => (
-                                                                            <option key={item} value={item}>
-                                                                                {item}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        입학일 *
-                                                                    </label>
-                                                                    <Input
-                                                                        className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        type="date"
-                                                                        value={edu.admissionDate}
-                                                                        onChange={(e) =>
-                                                                            updateEducationField(
-                                                                                index,
-                                                                                "admissionDate",
-                                                                                e.target.value
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                </div>
-
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        졸업일
-                                                                    </label>
-                                                                    <Input
-                                                                        className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        type="date"
-                                                                        value={edu.graduationDate}
-                                                                        onChange={(e) =>
-                                                                            updateEducationField(
-                                                                                index,
-                                                                                "graduationDate",
-                                                                                e.target.value
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={addEducation}
-                                            className="mb-6 flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 text-base font-semibold text-white shadow-sm hover:opacity-95"
-                                        >
-                                            + 학력 추가하기
-                                        </button>
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {activeTab === "경력사항" && (
-                                <Card className="rounded-2xl border border-slate-200 shadow-none">
-                                    <CardContent className="p-6">
-                                        <div className="mb-5">
-                                            <div className="flex items-center gap-2">
-                                                <Briefcase className="h-4 w-4 text-blue-500" />
-                                                <h3 className="text-2xl font-bold tracking-tight text-slate-800">
-                                                    경력사항
-                                                </h3>
-                                            </div>
-                                            <p className="mt-2 text-sm text-slate-500">
-                                                경력사항을 시간순(최신순)으로 입력해주세요. 드래그하여 순서를 변경할 수 있습니다.
-                                            </p>
-                                        </div>
-
-                                        {formData.career.length === 0 && (
-                                            <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-white text-center">
-                                                <Briefcase className="mb-4 h-12 w-12 text-slate-300" />
-                                                <p className="text-xl font-semibold text-slate-700">
-                                                    아직 경력사항이 없습니다
-                                                </p>
-                                                <p className="mt-2 text-sm text-slate-400">
-                                                    첫 번째 경력을 추가해보세요
-                                                </p>
-                                            </div>
-                                        )}
-
-                                        {formData.career.length > 0 && (
-                                            <div className="space-y-5">
-                                                {formData.career.map((career, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className="overflow-visible rounded-xl border border-slate-200 bg-white"
-                                                    >
-                                                        {/* 상단 헤더 */}
-                                                        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="text-slate-400">⋮⋮</div>
-                                                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                                                                    <Briefcase className="h-4 w-4 text-blue-500" />
-                                                                    경력 {index + 1}
-                                                                </div>
-                                                            </div>
-
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeCareer(index)}
-                                                                className="text-sm text-slate-400 hover:text-red-500"
-                                                            >
-                                                                삭제
-                                                            </button>
-                                                        </div>
-
-                                                        {/* 본문 */}
-                                                        <div className="space-y-5 p-5">
-                                                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                                                <AutoCompleteInput
-                                                                    label="회사명"
-                                                                    required
-                                                                    placeholder="회사명을 입력하세요"
-                                                                    value={career.companyName}
-                                                                    options={COMPANY_OPTIONS}
-                                                                    onChange={(value) =>
-                                                                        updateCareerField(index, "companyName", value)
-                                                                    }
-                                                                />
-
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        직책 *
-                                                                    </label>
-                                                                    <Input
-                                                                        className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        placeholder="직책을 입력하세요"
-                                                                        value={career.position}
-                                                                        onChange={(e) =>
-                                                                            updateCareerField(index, "position", e.target.value)
-                                                                        }
-                                                                    />
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_1fr_auto]">
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        시작일 *
-                                                                    </label>
-                                                                    <Input
-                                                                        className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        type="date"
-                                                                        value={career.startDate}
-                                                                        onChange={(e) =>
-                                                                            updateCareerField(index, "startDate", e.target.value)
-                                                                        }
-                                                                    />
-                                                                </div>
-
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        종료일
-                                                                    </label>
-                                                                    <Input
-                                                                        className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        type="date"
-                                                                        value={career.endDate}
-                                                                        onChange={(e) =>
-                                                                            updateCareerField(index, "endDate", e.target.value)
-                                                                        }
-                                                                        disabled={career.isCurrent}
-                                                                    />
-                                                                </div>
-
-                                                                <div className="flex items-end">
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant={career.isCurrent ? "default" : "outline"}
-                                                                        className="h-11 px-4"
-                                                                        onClick={() =>
-                                                                            updateCareerField(index, "isCurrent", !career.isCurrent)
-                                                                        }
-                                                                    >
-                                                                        재직중
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-
-                                                            <div>
-                                                                <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-slate-700">
-                                                                    <span className="text-blue-500">ⓘ</span>
-                                                                    담당업무 및 성과
-                                                                </div>
-
-                                                                <textarea
-                                                                    className="min-h-[110px] w-full rounded-md border border-slate-200 p-3 text-sm outline-none focus:ring-1 focus:ring-sky-500"
-                                                                    placeholder={`주요 담당업무와 성과를 구체적으로 작성해주세요
-예) • 사용자 경험 개선으로 전환율 15% 향상
-• React 기반 웹 애플리케이션 개발 및 유지보수`}
-                                                                    value={career.description}
+                                                                <select
+                                                                    className="h-11 min-w-[92px] rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:ring-1 focus:ring-sky-500"
+                                                                    value={edu.gpaScale}
                                                                     onChange={(e) =>
-                                                                        updateCareerField(index, "description", e.target.value)
+                                                                        updateEducationField(
+                                                                            index,
+                                                                            "gpaScale",
+                                                                            e.target.value
+                                                                        )
                                                                     }
-                                                                />
-
-                                                                <div className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                                                                    구체적인 수치와 성과를 포함하여 작성하면 더 좋습니다
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        <button
-                                            type="button"
-                                            onClick={addCareer}
-                                            className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-base font-semibold text-white shadow-sm hover:opacity-95"
-                                        >
-                                            + 경력 추가하기
-                                        </button>
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {activeTab === "보유기술" && (
-                                <Card className="rounded-2xl border border-slate-200 shadow-none">
-                                    <CardContent className="p-6">
-                                        <div className="mb-5">
-                                            <div className="flex items-center gap-2">
-                                                <Wrench className="h-4 w-4 text-cyan-500" />
-                                                <h3 className="text-2xl font-bold tracking-tight text-slate-800">
-                                                    보유 기술
-                                                </h3>
-                                            </div>
-                                            <p className="mt-2 text-sm text-slate-500">
-                                                보유하고 있는 기술을 카테고리별로 정리해주세요. 드래그하여 순서를 변경할 수 있습니다.
-                                            </p>
-                                        </div>
-
-                                        {formData.skillGroups.length === 0 && (
-                                            <div className="rounded-xl border border-slate-200 bg-white p-6">
-                                                <button
-                                                    type="button"
-                                                    onClick={addSkillGroup}
-                                                    className="mb-6 flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 text-base font-semibold text-white shadow-sm hover:opacity-95"
-                                                >
-                                                    + 스킬 그룹 추가하기
-                                                </button>
-
-                                                <div className="flex min-h-[220px] flex-col items-center justify-center text-center">
-                                                    <Wrench className="mb-4 h-12 w-12 text-slate-300" />
-                                                    <p className="text-xl font-semibold text-slate-700">
-                                                        아직 기술 스택이 없습니다
-                                                    </p>
-                                                    <p className="mt-2 text-sm text-slate-400">
-                                                        첫 번째 스킬 그룹을 추가해보세요
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {formData.skillGroups.length > 0 && (
-                                            <div className="space-y-5">
-                                                {formData.skillGroups.map((group, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className="overflow-visible rounded-xl border border-slate-200 bg-white"
-                                                    >
-                                                        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="text-slate-400">⋮⋮</div>
-                                                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                                                                    <Wrench className="h-4 w-4 text-cyan-500" />
-                                                                    스킬 {index + 1}
-                                                                </div>
-                                                            </div>
-
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeSkillGroup(index)}
-                                                                className="text-sm text-slate-400 hover:text-red-500"
-                                                            >
-                                                                삭제
-                                                            </button>
-                                                        </div>
-
-                                                        <div className="space-y-5 p-5">
-                                                            <div>
-                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                    카테고리 *
-                                                                </label>
-
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => openSkillCategoryModal(index)}
-                                                                    className="flex h-11 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-4 text-sm text-slate-500 hover:bg-slate-50"
                                                                 >
-                                                                    <div className="flex items-center gap-2">
-                                                                        <Wrench className="h-4 w-4 text-cyan-500" />
-                                                                        <span>
-                                                                            {group.category || "카테고리를 선택하세요"}
-                                                                        </span>
-                                                                    </div>
-                                                                    <Search className="h-4 w-4 text-slate-400" />
-                                                                </button>
+                                                                    {GPA_SCALE_OPTIONS.map((item) => (
+                                                                        <option key={item} value={item}>
+                                                                            {item}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
                                                             </div>
+                                                        </div>
 
+                                                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                                                             <div>
                                                                 <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                    스킬 목록 *
+                                                                    입학일 *
                                                                 </label>
-
-                                                                <div className="flex gap-2">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => openSkillSearchModal(index)}
-                                                                        className="flex h-11 flex-1 items-center rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-400 hover:bg-slate-50"
-                                                                    >
-                                                                        클릭하여 스킬 검색 및 추가
-                                                                    </button>
-
-                                                                    <Button
-                                                                        type="button"
-                                                                        className="h-11 px-4 bg-blue-500 hover:bg-blue-600"
-                                                                        onClick={() => openSkillSearchModal(index)}
-                                                                    >
-                                                                        <Search className="h-4 w-4" />
-                                                                    </Button>
-                                                                </div>
-
-                                                                {group.skills.length === 0 ? (
-                                                                    <div className="mt-5 rounded-md bg-slate-50 px-3 py-4 text-sm text-slate-400">
-                                                                        이 카테고리에 아직 추가된 스킬이 없습니다
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="mt-5 flex flex-wrap gap-3">
-                                                                        {group.skills.map((skill) => (
-                                                                            <div
-                                                                                key={skill}
-                                                                                className="flex items-center gap-3 rounded-2xl border border-blue-400 bg-blue-50 px-4 py-2 text-sm text-blue-600"
-                                                                            >
-                                                                                <span>{skill}</span>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    className="text-blue-500 hover:text-blue-700"
-                                                                                    onClick={() => removeSkillFromGroup(index, skill)}
-                                                                                >
-                                                                                    ×
-                                                                                </button>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-
-                                                <button
-                                                    type="button"
-                                                    onClick={addSkillGroup}
-                                                    className="flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 text-base font-semibold text-white shadow-sm hover:opacity-95"
-                                                >
-                                                    + 스킬 그룹 추가하기
-                                                </button>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {activeTab === "자격증" && (
-                                <Card className="rounded-2xl border border-slate-200 shadow-none">
-                                    <CardContent className="p-6">
-                                        <div className="mb-5">
-                                            <div className="flex items-center gap-2">
-                                                <Award className="h-4 w-4 text-blue-500" />
-                                                <h3 className="text-2xl font-bold tracking-tight text-slate-800">
-                                                    자격증
-                                                </h3>
-                                            </div>
-                                            <p className="mt-2 text-sm text-slate-500">
-                                                보유하신 자격증 정보를 입력해주세요. 드래그하여 순서를 변경할 수 있습니다.
-                                            </p>
-                                        </div>
-
-                                        {/* 초기 빈 화면 */}
-                                        {formData.certificates.length === 0 && (
-                                            <div className="rounded-xl border border-slate-200 bg-white p-6">
-                                                <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center">
-                                                    <Award className="mb-4 h-12 w-12 text-slate-300" />
-                                                    <p className="text-xl font-semibold text-slate-700">
-                                                        아직 등록된 자격증이 없습니다
-                                                    </p>
-                                                    <p className="mt-2 text-sm text-slate-400">
-                                                        '자격증 추가' 버튼을 클릭하여 첫 번째 자격증을 등록해보세요
-                                                    </p>
-                                                </div>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={addCertificate}
-                                                    className="mt-4 flex h-12 w-full items-center justify-center rounded-xl border border-dashed border-blue-400 bg-white text-base font-semibold text-blue-600 hover:bg-blue-50"
-                                                >
-                                                    + 자격증 추가
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* 입력 카드들 */}
-                                        {formData.certificates.length > 0 && (
-                                            <div className="space-y-5">
-                                                {formData.certificates.map((cert, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className="overflow-visible rounded-xl border border-slate-200 bg-white"
-                                                    >
-                                                        {/* 상단 헤더 */}
-                                                        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="text-slate-400">⋮⋮</div>
-                                                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                                                                    <Award className="h-4 w-4 text-blue-500" />
-                                                                    자격증 {index + 1}
-                                                                </div>
-                                                            </div>
-
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeCertificate(index)}
-                                                                className="text-sm text-slate-400 hover:text-red-500"
-                                                            >
-                                                                삭제
-                                                            </button>
-                                                        </div>
-
-                                                        {/* 본문 */}
-                                                        <div className="space-y-5 p-5">
-                                                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        자격증명 *
-                                                                    </label>
-                                                                    <Input
-                                                                        className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        placeholder="예: 정보처리기사"
-                                                                        value={cert.name}
-                                                                        onChange={(e) =>
-                                                                            updateCertificateField(index, "name", e.target.value)
-                                                                        }
-                                                                    />
-                                                                </div>
-
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        발급기관
-                                                                    </label>
-                                                                    <Input
-                                                                        className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        placeholder="예: 한국산업인력공단"
-                                                                        value={cert.issuer}
-                                                                        onChange={(e) =>
-                                                                            updateCertificateField(index, "issuer", e.target.value)
-                                                                        }
-                                                                    />
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        등급/점수 (선택)
-                                                                    </label>
-                                                                    <Input
-                                                                        className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        placeholder="예: 1급, 900점, Associate"
-                                                                        value={cert.grade}
-                                                                        onChange={(e) =>
-                                                                            updateCertificateField(index, "grade", e.target.value)
-                                                                        }
-                                                                    />
-                                                                </div>
-
-                                                                <div />
-                                                            </div>
-
-                                                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        취득일 *
-                                                                    </label>
-                                                                    <Input
-                                                                        className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        type="date"
-                                                                        value={cert.acquiredDate}
-                                                                        onChange={(e) =>
-                                                                            updateCertificateField(
-                                                                                index,
-                                                                                "acquiredDate",
-                                                                                e.target.value
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                </div>
-
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        만료일 (선택)
-                                                                    </label>
-                                                                    <Input
-                                                                        className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        type="date"
-                                                                        value={cert.expiryDate}
-                                                                        disabled={cert.noExpiry}
-                                                                        onChange={(e) =>
-                                                                            updateCertificateField(
-                                                                                index,
-                                                                                "expiryDate",
-                                                                                e.target.value
-                                                                            )
-                                                                        }
-                                                                    />
-
-                                                                    <div className="mt-3 flex items-center gap-3">
-                                                                        <button
-                                                                            type="button"
-                                                                            className={`rounded-md border px-3 py-2 text-sm ${cert.noExpiry
-                                                                                ? "border-blue-500 bg-blue-50 text-blue-600"
-                                                                                : "border-slate-200 bg-white text-slate-500"
-                                                                                }`}
-                                                                            onClick={() =>
-                                                                                updateCertificateField(index, "noExpiry", !cert.noExpiry)
-                                                                            }
-                                                                        >
-                                                                            ∞ 평생유효
-                                                                        </button>
-                                                                    </div>
-
-                                                                    <p className="mt-2 text-xs text-slate-400">
-                                                                        평생유효한 자격증인 경우 만료일을 입력하지 않아도 됩니다
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-
-                                                <button
-                                                    type="button"
-                                                    onClick={addCertificate}
-                                                    className="flex h-12 w-full items-center justify-center rounded-xl border border-dashed border-blue-400 bg-white text-base font-semibold text-blue-600 hover:bg-blue-50"
-                                                >
-                                                    + 자격증 추가
-                                                </button>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {activeTab === "수상경력" && (
-                                <Card className="rounded-2xl border border-slate-200 shadow-none">
-                                    <CardContent className="p-6">
-                                        <div className="mb-5">
-                                            <div className="flex items-center gap-2">
-                                                <Trophy className="h-4 w-4 text-blue-500" />
-                                                <h3 className="text-2xl font-bold text-slate-800">수상경력</h3>
-                                            </div>
-
-                                            <p className="mt-2 text-sm text-slate-500">
-                                                수상하신 경력을 입력해주세요. 드래그하여 순서를 변경할 수 있습니다.
-                                            </p>
-                                        </div>
-
-                                        {/* 초기 빈 상태 */}
-                                        {formData.awards.length === 0 && (
-                                            <div className="rounded-xl border border-slate-200 bg-white p-6">
-                                                <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center">
-                                                    <Trophy className="mb-4 h-12 w-12 text-slate-300" />
-
-                                                    <p className="text-xl font-semibold text-slate-700">
-                                                        아직 등록된 수상경력이 없습니다
-                                                    </p>
-
-                                                    <p className="mt-2 text-sm text-slate-400">
-                                                        '수상경력 추가' 버튼을 클릭하여 첫 번째 수상경력을 등록해보세요
-                                                    </p>
-                                                </div>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={addAward}
-                                                    className="mt-4 flex h-12 w-full items-center justify-center rounded-xl border border-dashed border-blue-400 bg-white text-base font-semibold text-blue-600 hover:bg-blue-50"
-                                                >
-                                                    + 수상경력 추가
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* 입력 카드 */}
-                                        {formData.awards.length > 0 && (
-                                            <div className="space-y-5">
-                                                {formData.awards.map((award, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className="overflow-visible rounded-xl border border-slate-200 bg-white"
-                                                    >
-                                                        {/* 카드 헤더 */}
-                                                        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="text-slate-400">⋮⋮</div>
-
-                                                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                                                                    <Trophy className="h-4 w-4 text-blue-500" />
-                                                                    수상경력 {index + 1}
-                                                                </div>
-                                                            </div>
-
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeAward(index)}
-                                                                className="text-sm text-slate-400 hover:text-red-500"
-                                                            >
-                                                                삭제
-                                                            </button>
-                                                        </div>
-
-                                                        {/* 카드 본문 */}
-                                                        <div className="space-y-5 p-5">
-                                                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        수상명
-                                                                    </label>
-
-                                                                    <Input
-                                                                        className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        placeholder="예: 대상, 우수논문상, 대통령상"
-                                                                        value={award.title}
-                                                                        onChange={(e) =>
-                                                                            updateAwardField(index, "title", e.target.value)
-                                                                        }
-                                                                    />
-                                                                </div>
-
-                                                                <div>
-                                                                    <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                        수여기관
-                                                                    </label>
-
-                                                                    <Input
-                                                                        className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                        placeholder="예: 교육부, 삼성전자, 서울대학교"
-                                                                        value={award.organization}
-                                                                        onChange={(e) =>
-                                                                            updateAwardField(
-                                                                                index,
-                                                                                "organization",
-                                                                                e.target.value
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                </div>
-                                                            </div>
-
-                                                            <div>
-                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                    설명/비고 (선택)
-                                                                </label>
-
                                                                 <Input
                                                                     className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                    placeholder="예: 전국 1등, 최우수상, 금상"
-                                                                    value={award.description}
+                                                                    type="date"
+                                                                    value={edu.admissionDate}
                                                                     onChange={(e) =>
-                                                                        updateAwardField(
+                                                                        updateEducationField(
                                                                             index,
-                                                                            "description",
+                                                                            "admissionDate",
                                                                             e.target.value
                                                                         )
                                                                     }
                                                                 />
                                                             </div>
 
-                                                            <div className="max-w-xs">
+                                                            <div>
                                                                 <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                    수상일
+                                                                    졸업일
                                                                 </label>
-
                                                                 <Input
-                                                                    type="date"
                                                                     className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                    value={award.date}
+                                                                    type="date"
+                                                                    value={edu.graduationDate}
                                                                     onChange={(e) =>
-                                                                        updateAwardField(index, "date", e.target.value)
+                                                                        updateEducationField(
+                                                                            index,
+                                                                            "graduationDate",
+                                                                            e.target.value
+                                                                        )
                                                                     }
                                                                 />
                                                             </div>
                                                         </div>
                                                     </div>
-                                                ))}
-
-                                                <button
-                                                    type="button"
-                                                    onClick={addAward}
-                                                    className="flex h-12 w-full items-center justify-center rounded-xl border border-dashed border-blue-400 bg-white text-base font-semibold text-blue-600 hover:bg-blue-50"
-                                                >
-                                                    + 수상경력 추가
-                                                </button>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <div className="fixed bottom-6 right-6 z-[9999] max-w-[calc(100vw-320px)]">
-                    <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-xl">
-                        <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-4">
-                            <div>
-                                <div className="text-sm font-semibold text-blue-600">
-                                    {currentStep + 1} / {totalSteps}
-                                </div>
-                                <div className="mt-1 flex gap-1">
-                                    {tabs.map((_, index) => (
-                                        <div
-                                            key={index}
-                                            className={`h-2 w-2 rounded-full ${index <= currentStep ? "bg-blue-500" : "bg-slate-300"}`}
-                                        />
-                                    ))}
-                                </div>
-                                <div className="mt-2 text-lg font-bold text-slate-800">
-                                    {activeTab} 입력
-                                </div>
-                            </div>
-
-                            <div className="min-w-0">
-                                <div className="flex flex-wrap items-center justify-end gap-3">
-                                    {!isFirstStep && (
-                                        <Button type="button" variant="outline" className="h-12 shrink-0 px-5" onClick={goPrevStep}>
-                                            <ChevronLeft className="mr-1 h-4 w-4" />
-                                            이전
-                                        </Button>
-                                    )}
-
-                                    <Button type="button" variant="outline" className="h-12 shrink-0 px-5" onClick={handleTempSave}>
-                                        <Save className="mr-1 h-4 w-4" />
-                                        임시저장
-                                    </Button>
-
-                                    {isLastStep ? (
-                                        <Button type="button" className="h-12 shrink-0 bg-emerald-500 px-6 text-white hover:bg-emerald-600" onClick={handlePreview}>
-                                            <Rocket className="mr-1 h-4 w-4" />
-                                            미리보기 및 완성
-                                        </Button>
-                                    ) : (
-                                        <Button type="button" className="h-12 shrink-0 bg-blue-600 px-6 text-white hover:bg-blue-700" onClick={goNextStep}>
-                                            다음 단계
-                                            <ChevronRight className="ml-1 h-4 w-4" />
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {previewModalOpen && (
-                    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40">
-                        <div className="w-[420px] rounded-2xl bg-white p-6 shadow-2xl">
-                            <div className="mb-4 flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">🚀</div>
-                                <div className="text-lg font-bold">미리보기 및 완성하기</div>
-                            </div>
-
-                            <div className="mb-6 text-sm text-gray-500">
-                                🎉 이력서가 완성되었습니다!<br />
-                                미리보기에서 최종 이력서를 확인하시겠습니까?
-                            </div>
-
-                            <div className="flex justify-end gap-3">
-                                <button type="button" onClick={() => setPreviewModalOpen(false)} className="rounded-lg bg-gray-100 px-5 py-2 text-gray-600">
-                                    취소
-                                </button>
-                                <button type="button" onClick={confirmPreview} className="rounded-lg bg-emerald-500 px-6 py-2 text-white">
-                                    미리보기 및 완성하기
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {skillModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-                        <div className="h-[80vh] w-[360px] overflow-hidden rounded-2xl bg-white shadow-2xl">
-                            <div className="flex items-center justify-between border-b px-5 py-4">
-                                <h4 className="text-xl font-bold text-slate-800">
-                                    스킬 카테고리 선택
-                                </h4>
-                                <button
-                                    type="button"
-                                    className="text-xl text-slate-500 hover:text-slate-700"
-                                    onClick={() => setSkillModalOpen(false)}
-                                >
-                                    ×
-                                </button>
-                            </div>
-
-                            <div className="h-[calc(80vh-73px)] overflow-y-auto px-5 py-4">
-                                <div className="relative mb-5">
-                                    <Input
-                                        className="h-11 border-slate-200 pr-10"
-                                        placeholder="카테고리 검색..."
-                                        value={skillModalSearch}
-                                        onChange={(e) => setSkillModalSearch(e.target.value)}
-                                    />
-                                    <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                </div>
-
-                                <div className="space-y-5">
-                                    {filteredSkillCategories.map((section) => {
-                                        const SectionIcon = section.icon
-                                        return (
-                                            <div key={section.group}>
-                                                <div className="mb-3 rounded-md bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 border-l-4 border-blue-500">
-                                                    {section.group}
                                                 </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={addEducation}
+                                        className="mb-6 flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 text-base font-semibold text-white shadow-sm hover:opacity-95"
+                                    >
+                                        + 학력 추가하기
+                                    </button>
+                                </CardContent>
+                            </Card>
+                        )}
 
-                                                <div className="space-y-2">
-                                                    {section.items.map((item) => (
+                        {activeTab === "경력사항" && (
+                            <Card className="rounded-2xl border border-slate-200 shadow-none">
+                                <CardContent className="p-6">
+                                    <div className="mb-5">
+                                        <div className="flex items-center gap-2">
+                                            <Briefcase className="h-4 w-4 text-blue-500" />
+                                            <h3 className="text-2xl font-bold tracking-tight text-slate-800">
+                                                경력사항
+                                            </h3>
+                                        </div>
+                                        <p className="mt-2 text-sm text-slate-500">
+                                            경력사항을 시간순(최신순)으로 입력해주세요.
+                                        </p>
+                                    </div>
+
+                                    {formData.career.length === 0 && (
+                                        <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-white text-center">
+                                            <Briefcase className="mb-4 h-12 w-12 text-slate-300" />
+                                            <p className="text-xl font-semibold text-slate-700">
+                                                아직 경력사항이 없습니다
+                                            </p>
+                                            <p className="mt-2 text-sm text-slate-400">
+                                                첫 번째 경력을 추가해보세요
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {formData.career.length > 0 && (
+                                        <div className="space-y-5">
+                                            {formData.career.map((career, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="overflow-visible rounded-xl border border-slate-200 bg-white"
+                                                >
+                                                    {/* 상단 헤더 */}
+                                                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="text-slate-400">⋮⋮</div>
+                                                            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                                                                <Briefcase className="h-4 w-4 text-blue-500" />
+                                                                경력 {index + 1}
+                                                            </div>
+                                                        </div>
+
                                                         <button
-                                                            key={item}
                                                             type="button"
-                                                            className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50"
-                                                            onClick={() => {
-                                                                if (selectedSkillGroupIndex !== null) {
-                                                                    updateSkillGroupField(
-                                                                        selectedSkillGroupIndex,
-                                                                        "category",
-                                                                        item
+                                                            onClick={() => removeCareer(index)}
+                                                            className="text-sm text-slate-400 hover:text-red-500"
+                                                        >
+                                                            삭제
+                                                        </button>
+                                                    </div>
+
+                                                    {/* 본문 */}
+                                                    <div className="space-y-5 p-5">
+                                                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                                            <AutoCompleteInput
+                                                                label="회사명"
+                                                                required
+                                                                placeholder="회사명을 입력하세요"
+                                                                value={career.companyName}
+                                                                options={COMPANY_OPTIONS}
+                                                                onChange={(value) =>
+                                                                    updateCareerField(index, "companyName", value)
+                                                                }
+                                                            />
+
+                                                            <div>
+                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                    직책 *
+                                                                </label>
+                                                                <Input
+                                                                    className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                    placeholder="직책을 입력하세요"
+                                                                    value={career.position}
+                                                                    onChange={(e) =>
+                                                                        updateCareerField(index, "position", e.target.value)
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_1fr_auto]">
+                                                            <div>
+                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                    시작일 *
+                                                                </label>
+                                                                <Input
+                                                                    className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                    type="date"
+                                                                    value={career.startDate}
+                                                                    onChange={(e) =>
+                                                                        updateCareerField(index, "startDate", e.target.value)
+                                                                    }
+                                                                />
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                    종료일
+                                                                </label>
+                                                                <Input
+                                                                    className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                    type="date"
+                                                                    value={career.endDate}
+                                                                    onChange={(e) =>
+                                                                        updateCareerField(index, "endDate", e.target.value)
+                                                                    }
+                                                                    disabled={career.isCurrent}
+                                                                />
+                                                            </div>
+
+                                                            <div className="flex items-end">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant={career.isCurrent ? "default" : "outline"}
+                                                                    className="h-11 px-4"
+                                                                    onClick={() =>
+                                                                        updateCareerField(index, "isCurrent", !career.isCurrent)
+                                                                    }
+                                                                >
+                                                                    재직중
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+
+                                                        <div>
+                                                            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-slate-700">
+                                                                <span className="text-blue-500">ⓘ</span>
+                                                                담당업무 및 성과
+                                                            </div>
+
+                                                            <textarea
+                                                                className="min-h-[110px] w-full rounded-md border border-slate-200 p-3 text-sm outline-none focus:ring-1 focus:ring-sky-500"
+                                                                placeholder={`주요 담당업무와 성과를 구체적으로 작성해주세요
+예) • 사용자 경험 개선으로 전환율 15% 향상
+• React 기반 웹 애플리케이션 개발 및 유지보수`}
+                                                                value={career.description}
+                                                                onChange={(e) =>
+                                                                    updateCareerField(index, "description", e.target.value)
+                                                                }
+                                                            />
+
+                                                            <div className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                                                                구체적인 수치와 성과를 포함하여 작성하면 더 좋습니다
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={addCareer}
+                                        className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-base font-semibold text-white shadow-sm hover:opacity-95"
+                                    >
+                                        + 경력 추가하기
+                                    </button>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {activeTab === "보유기술" && (
+                            <Card className="rounded-2xl border border-slate-200 shadow-none">
+                                <CardContent className="p-6">
+                                    <div className="mb-5">
+                                        <div className="flex items-center gap-2">
+                                            <Wrench className="h-4 w-4 text-cyan-500" />
+                                            <h3 className="text-2xl font-bold tracking-tight text-slate-800">
+                                                보유 기술
+                                            </h3>
+                                        </div>
+                                        <p className="mt-2 text-sm text-slate-500">
+                                            보유하고 있는 기술을 카테고리별로 정리해주세요.
+                                        </p>
+                                    </div>
+
+                                    {formData.skillGroups.length === 0 && (
+                                        <div className="rounded-xl border border-slate-200 bg-white p-6">
+                                            <button
+                                                type="button"
+                                                onClick={addSkillGroup}
+                                                className="mb-6 flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 text-base font-semibold text-white shadow-sm hover:opacity-95"
+                                            >
+                                                + 스킬 그룹 추가하기
+                                            </button>
+
+                                            <div className="flex min-h-[220px] flex-col items-center justify-center text-center">
+                                                <Wrench className="mb-4 h-12 w-12 text-slate-300" />
+                                                <p className="text-xl font-semibold text-slate-700">
+                                                    아직 기술 스택이 없습니다
+                                                </p>
+                                                <p className="mt-2 text-sm text-slate-400">
+                                                    첫 번째 스킬 그룹을 추가해보세요
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {formData.skillGroups.length > 0 && (
+                                        <div className="space-y-5">
+                                            {formData.skillGroups.map((group, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="overflow-visible rounded-xl border border-slate-200 bg-white"
+                                                >
+                                                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="text-slate-400">⋮⋮</div>
+                                                            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                                                                <Wrench className="h-4 w-4 text-cyan-500" />
+                                                                스킬 {index + 1}
+                                                            </div>
+                                                        </div>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeSkillGroup(index)}
+                                                            className="text-sm text-slate-400 hover:text-red-500"
+                                                        >
+                                                            삭제
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="space-y-5 p-5">
+                                                        <div>
+                                                            <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                카테고리 *
+                                                            </label>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openSkillCategoryModal(index)}
+                                                                className="flex h-11 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-4 text-sm text-slate-500 hover:bg-slate-50"
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <Wrench className="h-4 w-4 text-cyan-500" />
+                                                                    <span>
+                                                                        {group.category || "카테고리를 선택하세요"}
+                                                                    </span>
+                                                                </div>
+                                                                <Search className="h-4 w-4 text-slate-400" />
+                                                            </button>
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                스킬 목록 *
+                                                            </label>
+
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openSkillSearchModal(index)}
+                                                                    className="flex h-11 flex-1 items-center rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-400 hover:bg-slate-50"
+                                                                >
+                                                                    클릭하여 스킬 검색 및 추가
+                                                                </button>
+
+                                                                <Button
+                                                                    type="button"
+                                                                    className="h-11 px-4 bg-blue-500 hover:bg-blue-600"
+                                                                    onClick={() => openSkillSearchModal(index)}
+                                                                >
+                                                                    <Search className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+
+                                                            {group.skills.length === 0 ? (
+                                                                <div className="mt-5 rounded-md bg-slate-50 px-3 py-4 text-sm text-slate-400">
+                                                                    이 카테고리에 아직 추가된 스킬이 없습니다
+                                                                </div>
+                                                            ) : (
+                                                                <div className="mt-5 flex flex-wrap gap-3">
+                                                                    {group.skills.map((skill) => (
+                                                                        <div
+                                                                            key={skill}
+                                                                            className="flex items-center gap-3 rounded-2xl border border-blue-400 bg-blue-50 px-4 py-2 text-sm text-blue-600"
+                                                                        >
+                                                                            <span>{skill}</span>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="text-blue-500 hover:text-blue-700"
+                                                                                onClick={() => removeSkillFromGroup(index, skill)}
+                                                                            >
+                                                                                ×
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            <button
+                                                type="button"
+                                                onClick={addSkillGroup}
+                                                className="flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 text-base font-semibold text-white shadow-sm hover:opacity-95"
+                                            >
+                                                + 스킬 그룹 추가하기
+                                            </button>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {activeTab === "자격증" && (
+                            <Card className="rounded-2xl border border-slate-200 shadow-none">
+                                <CardContent className="p-6">
+                                    <div className="mb-5">
+                                        <div className="flex items-center gap-2">
+                                            <Award className="h-4 w-4 text-blue-500" />
+                                            <h3 className="text-2xl font-bold tracking-tight text-slate-800">
+                                                자격증
+                                            </h3>
+                                        </div>
+                                        <p className="mt-2 text-sm text-slate-500">
+                                            보유하신 자격증 정보를 입력해주세요.
+                                        </p>
+                                    </div>
+
+                                    {/* 초기 빈 화면 */}
+                                    {formData.certificates.length === 0 && (
+                                        <div className="rounded-xl border border-slate-200 bg-white p-6">
+                                            <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center">
+                                                <Award className="mb-4 h-12 w-12 text-slate-300" />
+                                                <p className="text-xl font-semibold text-slate-700">
+                                                    아직 등록된 자격증이 없습니다
+                                                </p>
+                                                <p className="mt-2 text-sm text-slate-400">
+                                                    '자격증 추가' 버튼을 클릭하여 첫 번째 자격증을 등록해보세요
+                                                </p>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={addCertificate}
+                                                className="mt-4 flex h-12 w-full items-center justify-center rounded-xl border border-dashed border-blue-400 bg-white text-base font-semibold text-blue-600 hover:bg-blue-50"
+                                            >
+                                                + 자격증 추가
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* 입력 카드들 */}
+                                    {formData.certificates.length > 0 && (
+                                        <div className="space-y-5">
+                                            {formData.certificates.map((cert, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="overflow-visible rounded-xl border border-slate-200 bg-white"
+                                                >
+                                                    {/* 상단 헤더 */}
+                                                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="text-slate-400">⋮⋮</div>
+                                                            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                                                                <Award className="h-4 w-4 text-blue-500" />
+                                                                자격증 {index + 1}
+                                                            </div>
+                                                        </div>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeCertificate(index)}
+                                                            className="text-sm text-slate-400 hover:text-red-500"
+                                                        >
+                                                            삭제
+                                                        </button>
+                                                    </div>
+
+                                                    {/* 본문 */}
+                                                    <div className="space-y-5 p-5">
+                                                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                                            <div>
+                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                    자격증명 *
+                                                                </label>
+                                                                <Input
+                                                                    className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                    placeholder="예: 정보처리기사"
+                                                                    value={cert.name}
+                                                                    onChange={(e) =>
+                                                                        updateCertificateField(index, "name", e.target.value)
+                                                                    }
+                                                                />
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                    발급기관
+                                                                </label>
+                                                                <Input
+                                                                    className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                    placeholder="예: 한국산업인력공단"
+                                                                    value={cert.issuer}
+                                                                    onChange={(e) =>
+                                                                        updateCertificateField(index, "issuer", e.target.value)
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                                            <div>
+                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                    등급/점수 (선택)
+                                                                </label>
+                                                                <Input
+                                                                    className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                    placeholder="예: 1급, 900점, Associate"
+                                                                    value={cert.grade}
+                                                                    onChange={(e) =>
+                                                                        updateCertificateField(index, "grade", e.target.value)
+                                                                    }
+                                                                />
+                                                            </div>
+
+                                                            <div />
+                                                        </div>
+
+                                                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                                            <div>
+                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                    취득일 *
+                                                                </label>
+                                                                <Input
+                                                                    className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                    type="date"
+                                                                    value={cert.acquiredDate}
+                                                                    onChange={(e) =>
+                                                                        updateCertificateField(
+                                                                            index,
+                                                                            "acquiredDate",
+                                                                            e.target.value
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                    만료일 (선택)
+                                                                </label>
+                                                                <Input
+                                                                    className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                    type="date"
+                                                                    value={cert.expiryDate}
+                                                                    disabled={cert.noExpiry}
+                                                                    onChange={(e) =>
+                                                                        updateCertificateField(
+                                                                            index,
+                                                                            "expiryDate",
+                                                                            e.target.value
+                                                                        )
+                                                                    }
+                                                                />
+
+                                                                <div className="mt-3 flex items-center gap-3">
+                                                                    <button
+                                                                        type="button"
+                                                                        className={`rounded-md border px-3 py-2 text-sm ${cert.noExpiry
+                                                                            ? "border-blue-500 bg-blue-50 text-blue-600"
+                                                                            : "border-slate-200 bg-white text-slate-500"
+                                                                            }`}
+                                                                        onClick={() =>
+                                                                            updateCertificateField(index, "noExpiry", !cert.noExpiry)
+                                                                        }
+                                                                    >
+                                                                        ∞ 평생유효
+                                                                    </button>
+                                                                </div>
+
+                                                                <p className="mt-2 text-xs text-slate-400">
+                                                                    평생유효한 자격증인 경우 만료일을 입력하지 않아도 됩니다
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            <button
+                                                type="button"
+                                                onClick={addCertificate}
+                                                className="flex h-12 w-full items-center justify-center rounded-xl border border-dashed border-blue-400 bg-white text-base font-semibold text-blue-600 hover:bg-blue-50"
+                                            >
+                                                + 자격증 추가
+                                            </button>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {activeTab === "수상경력" && (
+                            <Card className="rounded-2xl border border-slate-200 shadow-none">
+                                <CardContent className="p-6">
+                                    <div className="mb-5">
+                                        <div className="flex items-center gap-2">
+                                            <Trophy className="h-4 w-4 text-blue-500" />
+                                            <h3 className="text-2xl font-bold text-slate-800">수상경력</h3>
+                                        </div>
+
+                                        <p className="mt-2 text-sm text-slate-500">
+                                            수상하신 경력을 입력해주세요.
+                                        </p>
+                                    </div>
+
+                                    {/* 초기 빈 상태 */}
+                                    {formData.awards.length === 0 && (
+                                        <div className="rounded-xl border border-slate-200 bg-white p-6">
+                                            <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center">
+                                                <Trophy className="mb-4 h-12 w-12 text-slate-300" />
+
+                                                <p className="text-xl font-semibold text-slate-700">
+                                                    아직 등록된 수상경력이 없습니다
+                                                </p>
+
+                                                <p className="mt-2 text-sm text-slate-400">
+                                                    '수상경력 추가' 버튼을 클릭하여 첫 번째 수상경력을 등록해보세요
+                                                </p>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={addAward}
+                                                className="mt-4 flex h-12 w-full items-center justify-center rounded-xl border border-dashed border-blue-400 bg-white text-base font-semibold text-blue-600 hover:bg-blue-50"
+                                            >
+                                                + 수상경력 추가
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* 입력 카드 */}
+                                    {formData.awards.length > 0 && (
+                                        <div className="space-y-5">
+                                            {formData.awards.map((award, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="overflow-visible rounded-xl border border-slate-200 bg-white"
+                                                >
+                                                    {/* 카드 헤더 */}
+                                                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="text-slate-400">⋮⋮</div>
+
+                                                            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                                                                <Trophy className="h-4 w-4 text-blue-500" />
+                                                                수상경력 {index + 1}
+                                                            </div>
+                                                        </div>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeAward(index)}
+                                                            className="text-sm text-slate-400 hover:text-red-500"
+                                                        >
+                                                            삭제
+                                                        </button>
+                                                    </div>
+
+                                                    {/* 카드 본문 */}
+                                                    <div className="space-y-5 p-5">
+                                                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                                            <div>
+                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                    수상명
+                                                                </label>
+
+                                                                <Input
+                                                                    className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                    placeholder="예: 대상, 우수논문상, 대통령상"
+                                                                    value={award.title}
+                                                                    onChange={(e) =>
+                                                                        updateAwardField(index, "title", e.target.value)
+                                                                    }
+                                                                />
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                    수여기관
+                                                                </label>
+
+                                                                <Input
+                                                                    className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                    placeholder="예: 교육부, 삼성전자, 서울대학교"
+                                                                    value={award.organization}
+                                                                    onChange={(e) =>
+                                                                        updateAwardField(
+                                                                            index,
+                                                                            "organization",
+                                                                            e.target.value
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                설명/비고 (선택)
+                                                            </label>
+
+                                                            <Input
+                                                                className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                placeholder="예: 전국 1등, 최우수상, 금상"
+                                                                value={award.description}
+                                                                onChange={(e) =>
+                                                                    updateAwardField(
+                                                                        index,
+                                                                        "description",
+                                                                        e.target.value
                                                                     )
                                                                 }
-                                                                setSkillModalOpen(false)
-                                                            }}
-                                                        >
-                                                            <SectionIcon className="h-4 w-4 text-cyan-500" />
-                                                            <span>{item}</span>
-                                                        </button>
-                                                    ))}
+                                                            />
+                                                        </div>
+
+                                                        <div className="max-w-xs">
+                                                            <label className="mb-2 block text-[13px] font-semibold text-slate-700">
+                                                                수상일
+                                                            </label>
+
+                                                            <Input
+                                                                type="date"
+                                                                className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
+                                                                value={award.date}
+                                                                onChange={(e) =>
+                                                                    updateAwardField(index, "date", e.target.value)
+                                                                }
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
+                                            ))}
+
+                                            <button
+                                                type="button"
+                                                onClick={addAward}
+                                                className="flex h-12 w-full items-center justify-center rounded-xl border border-dashed border-blue-400 bg-white text-base font-semibold text-blue-600 hover:bg-blue-50"
+                                            >
+                                                + 수상경력 추가
+                                            </button>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            <div className="fixed bottom-6 right-6 z-[9999] max-w-[calc(100vw-320px)]">
+                <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-xl">
+                    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-4">
+                        <div>
+                            <div className="text-sm font-semibold text-blue-600">
+                                {currentStep + 1} / {totalSteps}
+                            </div>
+                            <div className="mt-1 flex gap-1">
+                                {tabs.map((_, index) => (
+                                    <div
+                                        key={index}
+                                        className={`h-2 w-2 rounded-full ${index <= currentStep ? "bg-blue-500" : "bg-slate-300"}`}
+                                    />
+                                ))}
+                            </div>
+                            <div className="mt-2 text-lg font-bold text-slate-800">
+                                {activeTab} 입력
                             </div>
                         </div>
-                    </div>
-                )}
 
-                {skillSearchModalOpen && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-                        <div className="w-[500px] max-w-[92vw] overflow-hidden rounded-2xl bg-white shadow-2xl">
-                            <div className="flex items-center justify-between border-b px-5 py-4">
-                                <h4 className="text-[28px] font-bold text-slate-800">스킬 검색</h4>
-                                <button
-                                    type="button"
-                                    className="text-slate-500 hover:text-slate-700"
-                                    onClick={() => setSkillSearchModalOpen(false)}
-                                >
-                                    <X className="h-6 w-6" />
-                                </button>
-                            </div>
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center justify-end gap-3">
+                                {!isFirstStep && (
+                                    <Button type="button" variant="outline" className="h-12 shrink-0 px-5" onClick={goPrevStep}>
+                                        <ChevronLeft className="mr-1 h-4 w-4" />
+                                        이전
+                                    </Button>
+                                )}
 
-                            <div className="border-b px-5 py-4">
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
-                                    <Input
-                                        className="h-12 border-blue-400 pl-10 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-blue-500"
-                                        placeholder="스킬명 입력..."
-                                        value={skillSearchKeyword}
-                                        onChange={(e) => setSkillSearchKeyword(e.target.value)}
-                                    />
-                                </div>
-                            </div>
+                                <Button type="button" variant="outline" className="h-12 shrink-0 px-5" onClick={handleTempSave}>
+                                    <Save className="mr-1 h-4 w-4" />
+                                    임시저장
+                                </Button>
 
-                            <div className="flex min-h-[240px] flex-col items-center justify-center px-5 py-10 text-center">
-                                <Info className="mb-4 h-14 w-14 text-slate-300" />
-
-                                {skillSearchKeyword.trim() === "" ? (
-                                    <p className="text-lg font-semibold text-slate-700">
-                                        스킬을 검색해주세요
-                                    </p>
+                                {isLastStep ? (
+                                    <Button type="button" className="h-12 shrink-0 bg-emerald-500 px-6 text-white hover:bg-emerald-600" onClick={handlePreview}>
+                                        <Rocket className="mr-1 h-4 w-4" />
+                                        미리보기 및 완성
+                                    </Button>
                                 ) : (
-                                    <>
-                                        <p className="text-lg font-semibold text-slate-700">
-                                            검색 결과가 없습니다
-                                        </p>
-
-                                        <button
-                                            type="button"
-                                            onClick={handleDirectAddSkill}
-                                            className="mt-4 rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
-                                        >
-                                            "{skillSearchKeyword}" 직접 추가
-                                        </button>
-                                    </>
+                                    <Button type="button" className="h-12 shrink-0 bg-blue-600 px-6 text-white hover:bg-blue-700" onClick={goNextStep}>
+                                        다음 단계
+                                        <ChevronRight className="ml-1 h-4 w-4" />
+                                    </Button>
                                 )}
                             </div>
                         </div>
                     </div>
-                )}
-                </>
-            )}
+                </div>
             </div>
-        )
-    }
+
+            {previewModalOpen && (
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40">
+                    <div className="w-[420px] rounded-2xl bg-white p-6 shadow-2xl">
+                        <div className="mb-4 flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">🚀</div>
+                            <div className="text-lg font-bold">미리보기 및 완성하기</div>
+                        </div>
+
+                        <div className="mb-6 text-sm text-gray-500">
+                            🎉 이력서가 완성되었습니다!<br />
+                            미리보기에서 최종 이력서를 확인하시겠습니까?
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            <button type="button" onClick={() => setPreviewModalOpen(false)} className="rounded-lg bg-gray-100 px-5 py-2 text-gray-600">
+                                취소
+                            </button>
+                            <button type="button" onClick={confirmPreview} className="rounded-lg bg-emerald-500 px-6 py-2 text-white">
+                                미리보기 및 완성하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {skillModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                    <div className="h-[80vh] w-[360px] overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <div className="flex items-center justify-between border-b px-5 py-4">
+                            <h4 className="text-xl font-bold text-slate-800">
+                                스킬 카테고리 선택
+                            </h4>
+                            <button
+                                type="button"
+                                className="text-xl text-slate-500 hover:text-slate-700"
+                                onClick={() => setSkillModalOpen(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="h-[calc(80vh-73px)] overflow-y-auto px-5 py-4">
+                            <div className="relative mb-5">
+                                <Input
+                                    className="h-11 border-slate-200 pr-10"
+                                    placeholder="카테고리 검색..."
+                                    value={skillModalSearch}
+                                    onChange={(e) => setSkillModalSearch(e.target.value)}
+                                />
+                                <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            </div>
+
+                            <div className="space-y-5">
+                                {filteredSkillCategories.map((section) => {
+                                    const SectionIcon = section.icon
+                                    return (
+                                        <div key={section.group}>
+                                            <div className="mb-3 rounded-md bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 border-l-4 border-blue-500">
+                                                {section.group}
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                {section.items.map((item) => (
+                                                    <button
+                                                        key={item}
+                                                        type="button"
+                                                        className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50"
+                                                        onClick={() => {
+                                                            if (selectedSkillGroupIndex !== null) {
+                                                                updateSkillGroupField(
+                                                                    selectedSkillGroupIndex,
+                                                                    "category",
+                                                                    item
+                                                                )
+                                                            }
+                                                            setSkillModalOpen(false)
+                                                        }}
+                                                    >
+                                                        <SectionIcon className="h-4 w-4 text-cyan-500" />
+                                                        <span>{item}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {skillSearchModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+                    <div className="w-[500px] max-w-[92vw] overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <div className="flex items-center justify-between border-b px-5 py-4">
+                            <h4 className="text-[28px] font-bold text-slate-800">스킬 검색</h4>
+                            <button
+                                type="button"
+                                className="text-slate-500 hover:text-slate-700"
+                                onClick={() => setSkillSearchModalOpen(false)}
+                            >
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        <div className="border-b px-5 py-4">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
+                                <Input
+                                    className="h-12 border-blue-400 pl-10 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-blue-500"
+                                    placeholder="스킬명 입력..."
+                                    value={skillSearchKeyword}
+                                    onChange={(e) => setSkillSearchKeyword(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex min-h-[240px] flex-col items-center justify-center px-5 py-10 text-center">
+                            <Info className="mb-4 h-14 w-14 text-slate-300" />
+
+                            {skillSearchKeyword.trim() === "" ? (
+                                <p className="text-lg font-semibold text-slate-700">
+                                    스킬을 검색해주세요
+                                </p>
+                            ) : (
+                                <>
+                                    <p className="text-lg font-semibold text-slate-700">
+                                        검색 결과가 없습니다
+                                    </p>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleDirectAddSkill}
+                                        className="mt-4 rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+                                    >
+                                        "{skillSearchKeyword}" 직접 추가
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}

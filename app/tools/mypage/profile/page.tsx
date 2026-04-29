@@ -1,5 +1,5 @@
 "use client"
-
+import { useRouter } from "next/navigation"
 import {
     User,
     Mail,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 
 export default function MyProfilePage() {
+    const router = useRouter()
     return (
         <div className="min-h-screen bg-slate-50 px-6 py-6">
             <div className="mx-auto max-w-6xl space-y-5">
@@ -152,7 +153,12 @@ export default function MyProfilePage() {
                     <div className="mt-3 h-0.5 w-10 bg-blue-600" />
 
                     <div className="mt-5 grid grid-cols-3 gap-4">
-                        <MenuCard icon={<FileText />} title="이력서 생성기" desc="AI로 이력서를 작성해보세요" />
+                        <MenuCard
+                            icon={<FileText />}
+                            title="이력서 생성기"
+                            desc="저장한 이력서를 확인하세요"
+                            onClick={() => router.push("/tools/mypage/save-builder-resume")}
+                        />
                         <MenuCard icon={<FileText />} title="자소서 생성기" desc="AI로 자기소개서를 작성해보세요" />
                         <MenuCard icon={<HelpCircle />} title="면접예상질문" desc="AI로 예상 면접 질문을 준비하세요" />
                         <MenuCard icon={<Users />} title="AI 면접 기록" desc="AI와 면접 연습을 해보세요" />
@@ -226,30 +232,18 @@ function InfoCard({
     )
 }
 
-function MenuCard({
-    icon,
-    title,
-    desc,
-    green = false,
-}: {
-    icon: React.ReactNode
-    title: string
-    desc: string
-    green?: boolean
-}) {
+function MenuCard({ icon, title, desc, green, onClick }: any) {
     return (
         <button
-            className={`flex items-center gap-5 rounded-xl border p-5 text-left transition hover:shadow ${green ? "border-emerald-200 bg-emerald-50" : "bg-slate-50"
-                }`}
+            type="button"
+            onClick={onClick}
+            className="rounded-2xl border bg-white p-5 text-left shadow-sm hover:border-blue-400 hover:bg-blue-50"
         >
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-blue-200 bg-blue-100 text-blue-600">
+            <div className={green ? "text-emerald-500" : "text-blue-600"}>
                 {icon}
             </div>
-
-            <div>
-                <div className="font-bold text-slate-900">{title}</div>
-                <div className="mt-1 text-sm text-slate-500">{desc}</div>
-            </div>
+            <h3 className="mt-4 font-bold text-slate-900">{title}</h3>
+            <p className="mt-1 text-sm text-slate-500">{desc}</p>
         </button>
     )
 }

@@ -86,7 +86,7 @@ export default function SignupPage() {
                         회원가입
                     </h1>
                     <p className="mt-3 text-sm text-slate-500">
-                        JOBMAKER 계정을 만들어 서비스를 이용해보세요
+                        자소서메이커 계정을 만들어 서비스를 이용해보세요
                     </p>
                 </div>
 
