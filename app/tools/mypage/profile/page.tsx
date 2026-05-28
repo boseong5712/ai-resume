@@ -1,11 +1,7 @@
 "use client"
+import type { ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import {
-    User,
-    Mail,
-    Crown,
-    Coins,
-    Ticket,
     FileText,
     HelpCircle,
     Users,
@@ -14,8 +10,6 @@ import {
     Folder,
     Heart,
     Edit,
-    ExternalLink,
-    Bell,
 } from "lucide-react"
 
 export default function MyProfilePage() {
@@ -159,11 +153,21 @@ export default function MyProfilePage() {
                             desc="저장한 이력서를 확인하세요"
                             onClick={() => router.push("/tools/mypage/save-builder-resume")}
                         />
-                        <MenuCard icon={<FileText />} title="자소서 생성기" desc="AI로 자기소개서를 작성해보세요" />
+                        <MenuCard
+                            icon={<FileText />}
+                            title="자소서 생성기"
+                            desc="저장한 자기소개서를 확인하세요"
+                            onClick={() => router.push("/tools/mypage/save-cover-letter")}
+                        />
                         <MenuCard icon={<HelpCircle />} title="면접예상질문" desc="AI로 예상 면접 질문을 준비하세요" />
                         <MenuCard icon={<Users />} title="AI 면접 기록" desc="AI와 면접 연습을 해보세요" />
                         <MenuCard icon={<Code2 />} title="테크트리 생성기" desc="AI로 기술 스택을 분석해보세요" />
-                        <MenuCard icon={<ClipboardCheck />} title="자기소개서 평가" desc="AI로 자기소개서를 평가받아보세요" />
+                        <MenuCard
+                            icon={<ClipboardCheck />}
+                            title="자기소개서 평가"
+                            desc="저장한 평가 결과를 확인하세요"
+                            onClick={() => router.push("/tools/mypage/save-cover-letter-review")}
+                        />
                         <MenuCard
                             icon={<Folder />}
                             title="경험 저장소"
@@ -196,43 +200,19 @@ export default function MyProfilePage() {
     )
 }
 
-function InfoCard({
+function MenuCard({
     icon,
     title,
-    value,
-    action,
-    green = false,
+    desc,
+    green,
+    onClick,
 }: {
-    icon: React.ReactNode
+    icon: ReactNode
     title: string
-    value: string
-    action: string
+    desc: string
     green?: boolean
+    onClick?: () => void
 }) {
-    return (
-        <div className="flex flex-col items-center justify-center rounded-2xl border bg-white p-6 text-center shadow-md">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-200 bg-blue-100">
-                {icon}
-            </div>
-
-            <div className="text-sm text-slate-500">{title}</div>
-
-            <div
-                className={`mt-2 text-xl font-bold ${green ? "text-emerald-500" : "text-slate-900"
-                    }`}
-            >
-                {value}
-            </div>
-
-            <button className="mt-3 flex items-center gap-1 text-sm font-bold text-blue-600">
-                {action}
-                <ExternalLink className="h-3 w-3" />
-            </button>
-        </div>
-    )
-}
-
-function MenuCard({ icon, title, desc, green, onClick }: any) {
     return (
         <button
             type="button"

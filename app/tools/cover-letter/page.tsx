@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
     Briefcase,
     Building2,
@@ -8,12 +8,10 @@ import {
     ChevronDown,
     ChevronRight,
     FileText,
-    HelpCircle,
     Info,
     Lightbulb,
-    Link2,
+    LoaderCircle,
     Pencil,
-    Play,
     Save,
     Sparkles,
     Tag,
@@ -22,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { JOB_DATA } from "@/app/data/jobData"
+import { CoverLetterWriteStep } from "@/components/cover-letter/write-step"
 
 type Career = {
     company: string
@@ -30,7 +29,64 @@ type Career = {
     description: string
 }
 
+type SavedResumeData = {
+    resumeTitle?: string
+    name?: string
+    email?: string
+    phone?: string
+    career?: Array<{
+        companyName?: string
+        position?: string
+        startDate?: string
+        endDate?: string
+        description?: string
+    }>
+    skillGroups?: Array<{
+        category?: string
+        skills?: string[]
+    }>
+    certificates?: Array<{
+        name?: string
+        grade?: string
+        issuer?: string
+        acquiredDate?: string
+    }>
+    education?: Array<{
+        schoolName?: string
+    }>
+}
+
+type SavedResume = {
+    id: string
+    title?: string
+    updatedAt?: string
+    data?: SavedResumeData
+}
+
+type CoverLetterItem = {
+    id: number
+    question: string
+    details: string[]
+    answer: string
+}
+
+type SavedCoverLetter = {
+    id: string
+    title: string
+    company: string
+    job: string
+    careerType: "신입" | "경력" | string
+    keywords: string[]
+    tasks: string[]
+    experiences: string[]
+    situationSummary: string
+    items: CoverLetterItem[]
+    integratedCoverLetter?: string
+    status: "saved" | "draft"
+}
+
 export default function CoverLetterPage() {
+    const [step, setStep] = useState<1 | 2>(1)
     const [title, setTitle] = useState("")
     const [company, setCompany] = useState("")
     const [selectedCategory, setSelectedCategory] = useState("")
@@ -38,12 +94,57 @@ export default function CoverLetterPage() {
     const [selectedTasks, setSelectedTasks] = useState<string[]>([])
     const [situationOpen, setSituationOpen] = useState(true)
     const [situation, setSituation] = useState("")
+    const [situationSummarizing, setSituationSummarizing] = useState(false)
+    const [situationNotice, setSituationNotice] = useState("")
     const [careerType, setCareerType] = useState<"신입" | "경력">("신입")
     const [careers, setCareers] = useState<Career[]>([])
     const [experienceInput, setExperienceInput] = useState("")
     const [experiences, setExperiences] = useState<string[]>([])
     const [keywordInput, setKeywordInput] = useState("")
     const [keywords, setKeywords] = useState<string[]>([])
+    const [resumeModalOpen, setResumeModalOpen] = useState(false)
+    const [savedResumes, setSavedResumes] = useState<SavedResume[]>([])
+    const [selectedResume, setSelectedResume] = useState<SavedResume | null>(null)
+    const [careerYears, setCareerYears] = useState("")
+    const [prevCompany, setPrevCompany] = useState("")
+    const [prevPosition, setPrevPosition] = useState("")
+    const [initialCoverLetterItems, setInitialCoverLetterItems] = useState<CoverLetterItem[] | undefined>()
+    const [initialSavedViewOpen, setInitialSavedViewOpen] = useState(false)
+    const [initialIntegratedCoverLetter, setInitialIntegratedCoverLetter] = useState("")
+
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: "auto" })
+        document.querySelector("main")?.scrollTo({ top: 0, behavior: "auto" })
+    }, [step])
+
+    useEffect(() => {
+        const mode = localStorage.getItem("coverLetterMode")
+        const targetId = mode === "view"
+            ? localStorage.getItem("viewCoverLetterId")
+            : localStorage.getItem("editingCoverLetterId")
+        if (!targetId || !mode) return
+
+        const savedCoverLetters = JSON.parse(localStorage.getItem("savedCoverLetters") || "[]") as SavedCoverLetter[]
+        const target = savedCoverLetters.find((item) => item.id === targetId)
+        if (!target) return
+
+        setTitle(target.title || "")
+        setCompany(target.company || "")
+        setSelectedJob(target.job || "")
+        setCareerType(target.careerType === "경력" ? "경력" : "신입")
+        setKeywords(target.keywords || [])
+        setSelectedTasks(target.tasks || [])
+        setExperiences(target.experiences || [])
+        setSituation(target.situationSummary || "")
+        setInitialCoverLetterItems(target.items || [])
+        setInitialIntegratedCoverLetter(target.integratedCoverLetter || "")
+        setInitialSavedViewOpen(mode === "view")
+        setStep(2)
+
+        localStorage.removeItem("viewCoverLetterId")
+        localStorage.removeItem("coverLetterMode")
+        if (mode === "view") localStorage.removeItem("editingCoverLetterId")
+    }, [])
 
     const selectedCategoryData = useMemo(() => {
         return JOB_DATA.find((item) => item.category === selectedCategory)
@@ -58,11 +159,7 @@ export default function CoverLetterPage() {
         if (!nextCategory) return
 
         setSelectedCategory(category)
-        const handleCategoryClick = (category: string) => {
-            setSelectedCategory(category)
-            setSelectedJob("")
-            setSelectedTasks([])
-        }
+        setSelectedJob("")
         setSelectedTasks([])
     }
 
@@ -77,6 +174,67 @@ export default function CoverLetterPage() {
                 ? prev.filter((item) => item !== task)
                 : [...prev, task]
         )
+    }
+
+    const createSituationFallback = (text: string) => {
+        const cleanText = text.trim().replace(/\s+/g, " ")
+        if (!cleanText) return ""
+
+        return [
+            `- ${cleanText}라는 개인적 상황과 강점을 자기소개서에 활용할 수 있습니다.`,
+            "- 해당 경험을 통해 지원 직무와 연결되는 실무 역량과 성장 가능성을 보여줄 수 있습니다.",
+            "- 부족한 부분은 지속적인 학습과 개선 노력으로 보완하고 있음을 강조할 수 있습니다.",
+            "- 이러한 배경을 바탕으로 지원 회사와 직무에 실질적으로 기여하고자 하는 의지를 드러낼 수 있습니다.",
+        ].join("\n")
+    }
+
+    const summarizeSituation = async () => {
+        const text = situation.trim()
+        if (!text) {
+            setSituationNotice("정리할 내용을 먼저 입력해주세요.")
+            return
+        }
+
+        setSituationSummarizing(true)
+        setSituationNotice("")
+
+        try {
+            const response = await fetch("/api/cover-letter/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "situation",
+                    situation: text,
+                    context: {
+                        company,
+                        job: selectedJob,
+                        careerType,
+                        keywords,
+                        tasks: selectedTasks,
+                        experiences,
+                    },
+                }),
+            })
+            const data = (await response.json()) as { text?: string; error?: string; code?: string }
+
+            if (!response.ok || !data.text) {
+                if (data.code === "OPENAI_API_KEY_MISSING" || data.code === "GEMINI_API_KEY_MISSING") {
+                    setSituationNotice("API 키가 없어 로컬 정리 결과를 표시합니다.")
+                } else {
+                    setSituationNotice(data.error || "AI 정리에 실패해 로컬 정리 결과를 표시합니다.")
+                }
+                setSituation(createSituationFallback(text))
+                return
+            }
+
+            setSituation(data.text.slice(0, 1000))
+            setSituationNotice("AI가 자기소개서에 활용하기 좋은 내용으로 정리했습니다.")
+        } catch {
+            setSituation(createSituationFallback(text))
+            setSituationNotice("AI 연결에 실패해 로컬 정리 결과를 표시합니다.")
+        } finally {
+            setSituationSummarizing(false)
+        }
     }
 
     const addCareer = () => {
@@ -112,55 +270,163 @@ export default function CoverLetterPage() {
         setKeywordInput("")
     }
 
+    const getMonthDiff = (start?: string, end?: string) => {
+        if (!start) return ""
+
+        const startDate = new Date(start)
+        const endDate = end ? new Date(end) : new Date()
+
+        if (Number.isNaN(startDate.getTime())) return ""
+
+        const months =
+            (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+            (endDate.getMonth() - startDate.getMonth())
+
+        if (months < 12) return `${Math.max(months, 1)}개월`
+
+        const years = Math.floor(months / 12)
+        const restMonths = months % 12
+
+        return restMonths > 0 ? `${years}년 ${restMonths}개월` : `${years}년`
+    }
+
+    const applyResumeToCoverLetter = (resume: SavedResume) => {
+        const data = resume.data || {}
+
+        setSelectedResume(resume)
+
+        if (data.resumeTitle || data.name) {
+            setTitle(data.resumeTitle || `${data.name}의 자기소개서`)
+        }
+
+        const careerItems = data.career || []
+        const firstCareer = careerItems[0]
+
+        if (firstCareer) {
+            setCareerType("경력")
+            setCareerYears(getMonthDiff(firstCareer.startDate, firstCareer.endDate))
+            setPrevCompany(firstCareer.companyName || "")
+            setPrevPosition(firstCareer.position || "")
+
+            setCareers(
+                careerItems.map((item) => ({
+                    company: item.companyName || "",
+                    position: item.position || "",
+                    period: getMonthDiff(item.startDate, item.endDate),
+                    description: item.description || "",
+                }))
+            )
+        } else {
+            setCareerType("신입")
+            setCareerYears("")
+            setPrevCompany("")
+            setPrevPosition("")
+            setCareers([])
+        }
+
+        const careerTexts = careerItems.flatMap((item) => {
+            const period = getMonthDiff(item.startDate, item.endDate)
+            return [
+                item.companyName && item.position
+                    ? `${item.companyName} ${item.position}${period ? ` ${period}` : ""}`
+                    : "",
+                item.description || "",
+            ].filter(Boolean)
+        })
+
+        const skillTexts =
+            data.skillGroups?.flatMap((group) => [
+                group.category || "",
+                ...(group.skills || []),
+            ]) || []
+
+        const certificateTexts =
+            data.certificates?.map((cert) =>
+                [
+                    cert.name,
+                    cert.grade,
+                    cert.issuer,
+                    cert.acquiredDate,
+                ]
+                    .filter(Boolean)
+                    .join(" · ")
+            ) || []
+
+        setExperiences([...careerTexts, ...skillTexts, ...certificateTexts])
+        setKeywords(skillTexts)
+
+        setResumeModalOpen(false)
+    }
+
+    if (step === 2) {
+        return (
+            <CoverLetterWriteStep
+                documentTitle={title}
+                company={company}
+                job={selectedJob}
+                careerType={careerType}
+                keywords={keywords}
+                tasks={selectedTasks}
+                experiences={experiences}
+                situationSummary={situation}
+                initialItems={initialCoverLetterItems}
+                initialSavedViewOpen={initialSavedViewOpen}
+                initialIntegratedCoverLetter={initialIntegratedCoverLetter}
+                onBack={() => setStep(1)}
+            />
+        )
+    }
+
     return (
         <div className="min-h-screen bg-slate-50 px-6 py-8">
-            <div className="mx-auto max-w-[900px] space-y-6 pb-32">
-                <section className="relative overflow-hidden rounded-[28px] border border-blue-100 bg-white px-10 py-12 text-center shadow-sm">
-                    <div className="absolute left-6 top-16 h-2 w-2 rounded-full bg-blue-300" />
-                    <div className="absolute right-10 top-6 h-8 w-8 rounded-full bg-blue-100 blur-xl" />
-                    <div className="absolute left-8 bottom-5 h-8 w-8 rounded-full bg-purple-100 blur-xl" />
+            <div className="mx-auto w-full max-w-[900px] space-y-5 rounded-[20px] bg-white p-7 pb-48 shadow-[0_4px_22px_rgba(38,60,112,0.08)]">
+                <section className="relative overflow-hidden rounded-[20px] border border-[#edf1fa] bg-white px-8 py-8 text-center shadow-sm">
+                    <span className="absolute left-3 top-8 h-1 w-1 rounded-full bg-blue-300" />
+                    <span className="absolute bottom-4 left-2 h-8 w-8 rounded-full bg-violet-100/70 blur-lg" />
+                    <span className="absolute right-3 top-2 h-9 w-9 rounded-full bg-blue-100 blur-lg" />
 
-                    <h1 className="text-[40px] font-extrabold tracking-tight text-blue-700">
+                    <h1 className="flex items-center justify-center gap-2 text-[30px] font-extrabold text-[#1760d6]">
+                        <Sparkles className="h-7 w-7 fill-blue-500 text-blue-500" />
                         자소서 생성기
                     </h1>
-                    <p className="mt-5 text-lg font-medium text-slate-600">
+                    <p className="mt-3 text-sm text-slate-500">
                         AI가 당신의 경험과 역량을 분석하여 맞춤형 자기소개서를 작성해드립니다
                     </p>
                 </section>
 
-                <section className="rounded-[24px] border border-slate-100 bg-white p-7 shadow-sm">
+                <section className="rounded-[18px] border border-[#edf1fa] bg-white px-6 py-5 shadow-sm">
                     <div className="flex items-start justify-between">
                         <div className="flex items-start gap-3">
-                            <div className="mt-1 flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500 text-white">
+                            <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-md bg-violet-500 text-white">
                                 <CheckSquare size={18} />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-slate-900">진행 상황</h2>
-                                <p className="mt-1 text-sm text-slate-500">
+                                <h2 className="text-base font-bold text-slate-800">진행 상황</h2>
+                                <p className="mt-0.5 text-xs text-slate-400">
                                     단계별로 차근차근 진행해보세요
                                 </p>
                             </div>
                         </div>
 
-                        <div className="text-right">
-                            <p className="mb-1 text-xs text-slate-500">사용법이 궁금하신가요?</p>
-                            <Button className="h-10 rounded-full bg-rose-500 px-5 text-white shadow-lg shadow-rose-200 hover:bg-rose-600">
-                                <Play className="mr-2 h-4 w-4 fill-white" />
-                                유튜브 영상보기
-                            </Button>
-                        </div>
                     </div>
 
-                    <div className="mt-8">
-                        <p className="text-sm font-bold text-slate-400">step 1 / 2</p>
-                        <h3 className="mt-2 text-2xl font-extrabold text-slate-900">
-                            기본 정보
-                        </h3>
+                    <div className="mt-5 flex items-center">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#347cff] text-sm font-bold text-white shadow-[0_0_0_4px_#edf4ff]">
+                            1
+                        </span>
+                        <span className="h-px flex-1 bg-[#337bff]" />
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-400 shadow-[0_0_0_4px_#f4f7fb]">
+                            2
+                        </span>
+                    </div>
+                    <div className="mt-2 flex justify-between text-xs">
+                        <span className="font-semibold text-[#347cff]">기본 정보</span>
+                        <span className="text-slate-400">본문 작성</span>
                     </div>
                 </section>
 
-                <section className="grid grid-cols-2 gap-4">
-                    <div className="rounded-[18px] border border-blue-100 bg-slate-50 p-6 shadow-sm">
+                <section className="grid grid-cols-1 gap-4">
+                    <div className="rounded-[18px] border border-[#d7e5ff] bg-[#fbfcff] p-6 shadow-sm">
                         <div className="flex items-start justify-between gap-4">
                             <div>
                                 <div className="flex items-center gap-2">
@@ -169,6 +435,7 @@ export default function CoverLetterPage() {
                                         이력서로 시작
                                     </h3>
                                 </div>
+
                                 <p className="mt-4 leading-7 text-slate-500">
                                     저장된 이력서 정보를
                                     <br />
@@ -178,38 +445,30 @@ export default function CoverLetterPage() {
                                 </p>
                             </div>
 
-                            <Button className="h-14 rounded-xl bg-blue-700 px-7 font-bold text-white shadow-lg shadow-blue-200 hover:bg-blue-800">
+                            <Button
+                                type="button"
+                                onClick={() => {
+                                    const resumes = JSON.parse(localStorage.getItem("savedResumes") || "[]") as SavedResume[]
+                                    setSavedResumes(resumes)
+                                    setResumeModalOpen(true)
+                                }}
+                                className="h-14 shrink-0 rounded-xl bg-blue-700 px-7 font-bold text-white shadow-lg shadow-blue-200 hover:bg-blue-800"
+                            >
                                 <FileText className="mr-2 h-4 w-4" />
                                 이력서 불러오기
                             </Button>
                         </div>
-                    </div>
 
-                    <div className="rounded-[18px] border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <Link2 className="h-5 w-5 text-emerald-600" />
-                                    <h3 className="text-xl font-extrabold text-slate-900">
-                                        채용공고로 시작
-                                    </h3>
-                                </div>
-                                <p className="mt-4 leading-7 text-slate-500">
-                                    URL을 입력하면 AI가
-                                    <br />
-                                    자동으로 분석해드려요
-                                </p>
+                        {selectedResume && (
+                            <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                                선택된 이력서: {selectedResume.title}
                             </div>
-
-                            <Button className="h-14 rounded-xl bg-emerald-600 px-7 font-bold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700">
-                                <Link2 className="mr-2 h-4 w-4" />
-                                URL 분석하기
-                            </Button>
-                        </div>
+                        )}
                     </div>
+
                 </section>
 
-                <section className="rounded-[18px] border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-[18px] border border-[#d7e5ff] bg-[#fbfcff] p-6 shadow-sm">
                     <div className="mb-4 flex items-center gap-2">
                         <Pencil className="h-6 w-6 text-blue-600" />
                         <h3 className="text-xl font-extrabold text-slate-900">제목</h3>
@@ -223,7 +482,7 @@ export default function CoverLetterPage() {
                     />
                 </section>
 
-                <section className="rounded-[18px] border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-[18px] border border-[#d7e5ff] bg-[#fbfcff] p-6 shadow-sm">
                     <div className="mb-4 flex items-center gap-2">
                         <Building2 className="h-6 w-6 text-blue-600" />
                         <h3 className="text-xl font-extrabold text-slate-900">기업명</h3>
@@ -237,7 +496,7 @@ export default function CoverLetterPage() {
                     />
                 </section>
 
-                <section className="rounded-[18px] border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-[18px] border border-[#d7e5ff] bg-[#fbfcff] p-6 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <Briefcase className="h-6 w-6 text-blue-600" />
@@ -409,7 +668,7 @@ export default function CoverLetterPage() {
                     )}
                 </section>
 
-                <section className="rounded-[18px] border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-[18px] border border-[#d7e5ff] bg-[#fbfcff] p-6 shadow-sm">
                     <button
                         type="button"
                         onClick={() => setSituationOpen((prev) => !prev)}
@@ -455,7 +714,13 @@ export default function CoverLetterPage() {
                                     </p>
                                 </div>
 
-                                <Button className="rounded-lg bg-violet-500 text-white hover:bg-violet-600">
+                                <Button
+                                    type="button"
+                                    onClick={summarizeSituation}
+                                    disabled={situationSummarizing}
+                                    className="rounded-lg bg-violet-500 text-white hover:bg-violet-600"
+                                >
+                                    {situationSummarizing && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
                                     ✨ AI 정리하기
                                 </Button>
                             </div>
@@ -483,11 +748,16 @@ export default function CoverLetterPage() {
                                 직무 관련 기술이나 경험 등 AI 모델이 더 나은 자소서를 작성하는 데
                                 도움이 될 다양한 정보
                             </div>
+                            {situationNotice && (
+                                <div className="mt-3 rounded-lg border border-violet-100 bg-white px-4 py-3 text-xs font-semibold text-violet-600">
+                                    {situationNotice}
+                                </div>
+                            )}
                         </div>
                     )}
                 </section>
 
-                <section className="rounded-[18px] border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-[18px] border border-[#d7e5ff] bg-[#fbfcff] p-6 shadow-sm">
                     <div className="mb-6 flex items-center gap-2">
                         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500 text-white">
                             <Briefcase size={16} />
@@ -535,6 +805,8 @@ export default function CoverLetterPage() {
                                         ⏰ 경력 연수
                                     </label>
                                     <Input
+                                        value={careerYears}
+                                        onChange={(e) => setCareerYears(e.target.value)}
                                         placeholder="예: 3년"
                                         className="h-12 rounded-lg border-emerald-200 bg-white"
                                     />
@@ -545,6 +817,8 @@ export default function CoverLetterPage() {
                                         🏢 이전 회사명
                                     </label>
                                     <Input
+                                        value={prevCompany}
+                                        onChange={(e) => setPrevCompany(e.target.value)}
                                         placeholder="예: 삼성전자"
                                         className="h-12 rounded-lg border-emerald-200 bg-white"
                                     />
@@ -555,6 +829,8 @@ export default function CoverLetterPage() {
                                         👤 직책/직무
                                     </label>
                                     <Input
+                                        value={prevPosition}
+                                        onChange={(e) => setPrevPosition(e.target.value)}
                                         placeholder="예: 프론트엔드 개발자"
                                         className="h-12 rounded-lg border-emerald-200 bg-white"
                                     />
@@ -826,9 +1102,9 @@ export default function CoverLetterPage() {
                 </section>
             </div>
 
-            <div className="fixed bottom-6 right-8 z-50 rounded-2xl bg-white p-4 shadow-2xl">
-                <div className="flex items-center gap-5">
-                    <div className="min-w-[170px]">
+            <div className="fixed bottom-6 right-8 z-50 w-[min(400px,calc(100vw-48px))] rounded-2xl border border-[#d7e5ff] bg-white p-4 shadow-[0_8px_28px_rgba(38,60,112,0.16)]">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1 text-sm font-bold text-blue-600">
                             1 <span className="text-slate-400">/ 2</span>
                             <span className="ml-1 h-3 w-3 rounded-full bg-blue-500" />
@@ -839,23 +1115,107 @@ export default function CoverLetterPage() {
                         </div>
                     </div>
 
-                    <Button
-                        variant="outline"
-                        className="h-12 w-14 rounded-xl border-slate-200 bg-slate-50"
-                    >
-                        <Save className="h-5 w-5 text-slate-500" />
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                            variant="outline"
+                            className="h-11 w-11 rounded-xl border-[#d7e5ff] bg-[#f7faff] p-0"
+                        >
+                            <Save className="h-4 w-4 text-[#347cff]" />
+                        </Button>
 
-                    <Button className="h-12 rounded-xl bg-blue-600 px-7 text-base font-extrabold text-white shadow-lg shadow-blue-200 hover:bg-blue-700">
-                        다음 단계
-                        <ChevronRight className="ml-2 h-5 w-5" />
-                    </Button>
+                        <Button
+                            type="button"
+                            onClick={() => setStep(2)}
+                            className="h-11 rounded-xl bg-[#397df0] px-5 text-sm font-extrabold text-white shadow-lg shadow-blue-200 hover:bg-blue-700"
+                        >
+                            다음 단계
+                            <ChevronRight className="ml-1 h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
             </div>
 
-            <button className="fixed bottom-8 right-8 z-40 translate-x-28 rounded-full bg-blue-600 p-5 text-white shadow-xl">
-                <HelpCircle size={28} />
-            </button>
+            {resumeModalOpen && (
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50">
+                    <div className="max-h-[82vh] w-[720px] overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <div className="flex items-center justify-between border-b px-7 py-6">
+                            <h2 className="text-2xl font-extrabold text-slate-900">
+                                저장된 이력서 선택
+                            </h2>
+
+                            <button
+                                type="button"
+                                onClick={() => setResumeModalOpen(false)}
+                                className="text-slate-500 hover:text-slate-800"
+                            >
+                                <X size={28} />
+                            </button>
+                        </div>
+
+                        <div className="max-h-[560px] space-y-4 overflow-y-auto p-6">
+                            {savedResumes.length === 0 ? (
+                                <div className="rounded-xl border p-10 text-center text-slate-500">
+                                    저장된 이력서가 없습니다.
+                                </div>
+                            ) : (
+                                savedResumes.map((resume) => {
+                                    const data = resume.data || {}
+
+                                    return (
+                                        <button
+                                            key={resume.id}
+                                            type="button"
+                                            onClick={() => applyResumeToCoverLetter(resume)}
+                                            className="w-full rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm hover:border-blue-400 hover:bg-blue-50"
+                                        >
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <FileText className="h-5 w-5 text-indigo-500" />
+                                                    <h3 className="text-xl font-bold text-slate-900">
+                                                        {resume.title || data.resumeTitle || "제목 없는 이력서"}
+                                                    </h3>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 text-sm text-slate-500">
+                                                    📅 {resume.updatedAt?.slice(0, 10) || "날짜 없음"}
+                                                    <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-600">
+                                                        완성
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-5 flex flex-wrap gap-4 text-sm text-slate-500">
+                                                <span>👤 {data.name || "이름 없음"}</span>
+                                                <span>✉️ {data.email || "이메일 없음"}</span>
+                                                <span>📞 {data.phone || "전화번호 없음"}</span>
+                                            </div>
+
+                                            <div className="mt-4 flex flex-wrap gap-2">
+                                                {data.career?.[0]?.companyName && (
+                                                    <span className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-600">
+                                                        최근: {data.career[0].companyName}
+                                                    </span>
+                                                )}
+
+                                                {data.education?.[0]?.schoolName && (
+                                                    <span className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-600">
+                                                        학력: {data.education[0].schoolName}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </button>
+                                    )
+                                })
+                            )}
+                        </div>
+
+                        <div className="border-t bg-slate-50 px-6 py-4 text-center text-sm text-slate-600">
+                            이력서를 선택하면 해당 정보를 바탕으로 자소서 초기 설정이 구성됩니다.
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
+        
     )
 }

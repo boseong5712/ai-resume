@@ -858,27 +858,33 @@ export default function ResumeBuilderPage() {
     const router = useRouter()
 
     return (
-        <div className="relative min-h-screen">
-            <div className="max-w-5xl mx-auto space-y-6">
-                <Card className="rounded-2xl border border-slate-200 shadow-sm">
-                    <CardContent className="p-7">
-                        <div className="flex items-start justify-between gap-6">
-                            <div>
-                                <h2 className="text-3xl font-bold text-slate-900">이력서 작성</h2>
+        <div className="relative min-h-screen bg-slate-50 px-6 py-8">
+            <div className="mx-auto w-full max-w-[900px] space-y-5 rounded-[20px] bg-white p-7 pb-48 shadow-[0_4px_22px_rgba(38,60,112,0.08)]">
+                <Card className="relative overflow-hidden rounded-[20px] border border-[#edf1fa] bg-white shadow-sm">
+                    <CardContent className="px-8 py-8">
+                        <span className="absolute left-3 top-8 h-1 w-1 rounded-full bg-blue-300" />
+                        <span className="absolute bottom-4 left-2 h-8 w-8 rounded-full bg-violet-100/70 blur-lg" />
+                        <span className="absolute right-3 top-2 h-9 w-9 rounded-full bg-blue-100 blur-lg" />
+                        <div className="relative flex items-start justify-between gap-6">
+                            <div className="text-center sm:text-left">
+                                <h2 className="flex items-center justify-center gap-2 text-[30px] font-extrabold text-[#1760d6] sm:justify-start">
+                                    <Sparkles className="h-7 w-7 fill-blue-500 text-blue-500" />
+                                    이력서 생성기
+                                </h2>
                                 <p className="mt-3 text-sm text-slate-500">
                                     단계별로 차근차근 완성해보세요
                                 </p>
                             </div>
 
                             <div className="flex gap-3">
-                                <div className="flex h-[74px] w-[118px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
-                                    <div className="text-3xl font-bold text-blue-600">
+                                <div className="flex h-[74px] w-[118px] flex-col items-center justify-center rounded-xl border border-[#d7e5ff] bg-[#f7faff]">
+                                    <div className="text-3xl font-bold text-[#347cff]">
                                         {progress}%
                                     </div>
                                     <div className="mt-1 text-xs text-slate-500">완성률</div>
                                 </div>
 
-                                <div className="flex h-[74px] w-[118px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+                                <div className="flex h-[74px] w-[118px] flex-col items-center justify-center rounded-xl border border-[#d7e5ff] bg-[#f7faff]">
                                     <div className="text-lg font-bold text-slate-900">
                                         {progress >= 100 ? "완성" : "작성중"}
                                     </div>
@@ -886,20 +892,20 @@ export default function ResumeBuilderPage() {
                                 </div>
                             </div>
                         </div>
-                        <div className="mt-4 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-medium text-blue-600">
+                        <div className="relative mt-4 inline-flex items-center rounded-full border border-[#d7e5ff] bg-[#f7faff] px-3 py-1 text-sm font-medium text-[#347cff]">
                             이력서 제목&nbsp;
                             <span className="font-bold">
                                 {formData.resumeTitle || "미입력"}
                             </span>
                         </div>
-                        <div className="mt-8 h-2 w-full rounded-full bg-slate-200">
+                        <div className="relative mt-8 h-2 w-full rounded-full bg-[#edf4ff]">
                             <div
-                                className="h-2 rounded-full bg-emerald-500 transition-all"
+                                className="h-2 rounded-full bg-[#347cff] transition-all"
                                 style={{ width: `${Math.min(progress / 2, 100)}%` }}
                             />
                         </div>
 
-                        <div className="mt-5 flex h-14 items-center justify-between rounded-xl border border-slate-200 bg-white px-5 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+                        <div className="relative mt-5 flex h-14 items-center justify-between rounded-xl border border-[#d7e5ff] bg-white px-5 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
                             <div className="flex min-w-0 flex-1 items-center gap-3">
                                 <span className="text-slate-400 text-lg">📄</span>
 
@@ -941,7 +947,7 @@ export default function ResumeBuilderPage() {
                     </CardContent>
                 </Card>
                 
-                <Card>
+                <Card className="rounded-[18px] border border-[#edf1fa] bg-white shadow-sm">
                     <CardContent className="p-4">
                         <div className="flex flex-wrap gap-3">
                             {tabs.map((tab) => {
@@ -952,8 +958,8 @@ export default function ResumeBuilderPage() {
                                         key={tab}
                                         onClick={() => setActiveTab(tab)}
                                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${isActive
-                                                ? "bg-blue-100 text-blue-600 font-medium"
-                                                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                                ? "bg-[#347cff] text-white font-bold shadow-sm"
+                                                : "bg-[#f7faff] text-slate-500 hover:bg-blue-50"
                                             }`}
                                     >
                                         {iconMap[tab]}
@@ -965,7 +971,7 @@ export default function ResumeBuilderPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="min-h-[500px]">
+                <Card className="min-h-[500px] rounded-[18px] border border-[#edf1fa] bg-[#fbfcff] shadow-sm">
                     <CardContent className="p-6">
                         {activeTab === "기본정보" && (
                             <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-6">
@@ -1931,9 +1937,9 @@ export default function ResumeBuilderPage() {
                 </Card>
             </div>
 
-            <div className="fixed bottom-6 right-6 z-[9999] max-w-[calc(100vw-320px)]">
-                <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-xl">
-                    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-4">
+            <div className="fixed bottom-6 right-8 z-[9999] w-[min(420px,calc(100vw-48px))]">
+                <div className="rounded-2xl border border-[#d7e5ff] bg-white px-4 py-4 shadow-[0_8px_28px_rgba(38,60,112,0.16)]">
+                    <div className="grid grid-cols-[128px_minmax(0,1fr)] items-center gap-3">
                         <div>
                             <div className="text-sm font-semibold text-blue-600">
                                 {currentStep + 1} / {totalSteps}
@@ -1952,26 +1958,25 @@ export default function ResumeBuilderPage() {
                         </div>
 
                         <div className="min-w-0">
-                            <div className="flex flex-wrap items-center justify-end gap-3">
+                            <div className="flex flex-nowrap items-center justify-end gap-2">
                                 {!isFirstStep && (
-                                    <Button type="button" variant="outline" className="h-12 shrink-0 px-5" onClick={goPrevStep}>
+                                    <Button type="button" variant="outline" className="h-11 shrink-0 rounded-xl border-slate-200 bg-slate-50 px-3 text-sm text-slate-500" onClick={goPrevStep}>
                                         <ChevronLeft className="mr-1 h-4 w-4" />
                                         이전
                                     </Button>
                                 )}
 
-                                <Button type="button" variant="outline" className="h-12 shrink-0 px-5" onClick={handleTempSave}>
-                                    <Save className="mr-1 h-4 w-4" />
-                                    임시저장
+                                <Button type="button" variant="outline" aria-label="임시저장" className="h-11 w-11 shrink-0 rounded-xl border-slate-200 bg-slate-50 p-0" onClick={handleTempSave}>
+                                    <Save className="h-4 w-4 text-slate-500" />
                                 </Button>
 
                                 {isLastStep ? (
-                                    <Button type="button" className="h-12 shrink-0 bg-emerald-500 px-6 text-white hover:bg-emerald-600" onClick={handlePreview}>
+                                    <Button type="button" className="h-11 shrink-0 rounded-xl bg-emerald-500 px-4 text-sm font-bold text-white hover:bg-emerald-600" onClick={handlePreview}>
                                         <Rocket className="mr-1 h-4 w-4" />
-                                        미리보기 및 완성
+                                        완성
                                     </Button>
                                 ) : (
-                                    <Button type="button" className="h-12 shrink-0 bg-blue-600 px-6 text-white hover:bg-blue-700" onClick={goNextStep}>
+                                    <Button type="button" className="h-11 shrink-0 rounded-xl bg-[#397df0] px-5 text-sm font-bold text-white shadow-lg shadow-blue-200 hover:bg-blue-700" onClick={goNextStep}>
                                         다음 단계
                                         <ChevronRight className="ml-1 h-4 w-4" />
                                     </Button>

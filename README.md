@@ -66,6 +66,23 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 
 NEXT_PUBLIC_FIREBASE_APP_ID=
 
+### Firestore permissions
+
+The application creates and reads a private profile at `users/{uid}` after
+Firebase Authentication sign-up. Deploy the included Cloud Firestore rules
+before using sign-up, otherwise Firestore returns
+`Missing or insufficient permissions.`:
+
+```bash
+npx firebase-tools login
+npx firebase-tools deploy --only firestore:rules --project your-project-id
+```
+
+Replace `your-project-id` with `NEXT_PUBLIC_FIREBASE_PROJECT_ID` from
+`.env.local`. The included rules allow each authenticated user to create and
+read only their own profile document; all unspecified Firestore access remains
+denied.
+
 4️⃣ 실행
 npm run dev
 

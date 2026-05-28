@@ -93,7 +93,7 @@ export default function ToolsLayout({ children }: { children: React.ReactNode })
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-            <aside className="w-64 shrink-0 border-r bg-white p-4 flex h-screen flex-col">
+            <aside className="sticky top-0 h-screen w-64 shrink-0 border-r bg-white p-4 flex flex-col">
                 <div>
                     <h1 className="mb-6 text-xl font-bold text-blue-600">자소서메이커</h1>
 
@@ -145,7 +145,7 @@ export default function ToolsLayout({ children }: { children: React.ReactNode })
                 </div>
             </aside>
 
-            <main className="flex-1 overflow-y-auto p-10">{children}</main>
+            <main className="h-screen flex-1 overflow-y-auto p-10">{children}</main>
         </div>
     )
 }
