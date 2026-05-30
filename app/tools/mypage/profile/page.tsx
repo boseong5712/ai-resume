@@ -3,13 +3,8 @@ import type { ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import {
     FileText,
-    HelpCircle,
     Users,
-    Code2,
     ClipboardCheck,
-    Folder,
-    Heart,
-    Edit,
 } from "lucide-react"
 
 export default function MyProfilePage() {
@@ -17,36 +12,6 @@ export default function MyProfilePage() {
     return (
         <div className="min-h-screen bg-slate-50 px-6 py-6">
             <div className="mx-auto max-w-6xl space-y-5">
-                {/* 상단 탭 */}
-                <div className="rounded-xl border bg-white p-2 shadow-sm">
-                    <div className="flex items-center justify-between gap-2 overflow-x-auto">
-                        {[
-                            "내 정보",
-                            "내 지원 현황",
-                            "받은 면접 제안",
-                            "받은 컨택",
-                            "관심 채용공고",
-                            "내가 쓴 게시글",
-                            "컨설팅 요청내역",
-                            "구독 내역",
-                        ].map((tab, index) => (
-                            <button
-                                key={tab}
-                                className={`shrink-0 rounded-lg px-6 py-3 text-sm font-semibold ${index === 0
-                                        ? "bg-blue-600 text-white shadow"
-                                        : "text-slate-600 hover:bg-slate-100"
-                                    }`}
-                            >
-                                {tab}
-                            </button>
-                        ))}
-
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-blue-200 text-xs text-slate-400">
-                            성장군
-                        </div>
-                    </div>
-                </div>
-
                 {/* 프로필 카드 */}
                 {/* <section className="rounded-xl border bg-white p-0 shadow-sm">
                     <div className="h-1.5 rounded-t-xl bg-gradient-to-r from-blue-500 via-pink-500 to-emerald-400" />
@@ -154,47 +119,32 @@ export default function MyProfilePage() {
                             onClick={() => router.push("/tools/mypage/save-builder-resume")}
                         />
                         <MenuCard
+                            icon={<ClipboardCheck />}
+                            title="이력서 피드백"
+                            desc="저장한 이력서의 AI 피드백을 확인하세요"
+                            onClick={() => router.push("/tools/mypage/save-resume-feedback")}
+                        />
+                        <MenuCard
                             icon={<FileText />}
                             title="자소서 생성기"
                             desc="저장한 자기소개서를 확인하세요"
                             onClick={() => router.push("/tools/mypage/save-cover-letter")}
                         />
-                        <MenuCard icon={<HelpCircle />} title="면접예상질문" desc="AI로 예상 면접 질문을 준비하세요" />
-                        <MenuCard icon={<Users />} title="AI 면접 기록" desc="AI와 면접 연습을 해보세요" />
-                        <MenuCard icon={<Code2 />} title="테크트리 생성기" desc="AI로 기술 스택을 분석해보세요" />
+                        <MenuCard
+                            icon={<Users />}
+                            title="AI 면접 기록"
+                            desc="저장된 AI 면접 문답을 확인하세요"
+                            onClick={() => router.push("/tools/mypage/save-ai-interviews")}
+                        />
                         <MenuCard
                             icon={<ClipboardCheck />}
                             title="자기소개서 평가"
                             desc="저장한 평가 결과를 확인하세요"
                             onClick={() => router.push("/tools/mypage/save-cover-letter-review")}
                         />
-                        <MenuCard
-                            icon={<Folder />}
-                            title="경험 저장소"
-                            desc="자소서에 활용할 경험을 관리하세요"
-                            green
-                        />
                     </div>
                 </section>
 
-                {/* 활동 기록 */}
-                <section className="rounded-2xl border bg-white p-6 shadow-sm">
-                    <h2 className="text-2xl font-bold text-slate-900">📊활동 기록</h2>
-
-                    <div className="mt-5 grid grid-cols-2 gap-5">
-                        <ActivityCard
-                            icon={<Heart />}
-                            title="관심 채용공고"
-                            desc="관심등록한 채용공고를 확인해보세요"
-                        />
-
-                        <ActivityCard
-                            icon={<Edit />}
-                            title="내가 쓴 게시글"
-                            desc="커뮤니티에 작성한 게시글을 확인해보세요"
-                        />
-                    </div>
-                </section>
             </div>
         </div>
     )
@@ -228,30 +178,3 @@ function MenuCard({
     )
 }
 
-function ActivityCard({
-    icon,
-    title,
-    desc,
-}: {
-    icon: React.ReactNode
-    title: string
-    desc: string
-}) {
-    return (
-        <div className="flex items-center gap-5 rounded-2xl border bg-slate-100 p-6">
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-emerald-500 text-white shadow">
-                {icon}
-            </div>
-
-            <div>
-                <div className="text-lg font-bold text-slate-900">{title}</div>
-                <div className="mt-1 text-sm text-slate-500">
-                    {desc}
-                    <span className="ml-2 rounded-full bg-emerald-500 px-2 py-1 text-xs font-bold text-white">
-                        0개
-                    </span>
-                </div>
-            </div>
-        </div>
-    )
-}

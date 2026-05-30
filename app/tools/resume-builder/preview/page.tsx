@@ -3,30 +3,99 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import Image from "next/image"
 
-type ResumeData = any
+type EducationItem = {
+    schoolName?: string
+    major?: string
+    admissionDate?: string
+    graduationDate?: string
+    status?: string
+}
+
+type CareerItem = {
+    companyName?: string
+    position?: string
+    startDate?: string
+    endDate?: string
+    isCurrent?: boolean
+    description?: string
+}
+
+type SkillGroupItem = {
+    category?: string
+    skills?: string[]
+}
+
+type CertificateItem = {
+    name?: string
+    issuer?: string
+    grade?: string
+    acquiredDate?: string
+}
+
+type AwardItem = {
+    title?: string
+    organization?: string
+    date?: string
+}
+
+type ResumeData = {
+    resumeTitle?: string
+    name?: string
+    email?: string
+    phone?: string
+    address?: string
+    birthDate?: string
+    photoUrl?: string
+    education?: EducationItem[]
+    career?: CareerItem[]
+    skillGroups?: SkillGroupItem[]
+    certificates?: CertificateItem[]
+    awards?: AwardItem[]
+}
+
+type SavedResume = {
+    id: string
+    title?: string
+    data: ResumeData
+    createdAt?: string
+    updatedAt?: string
+    isMain?: boolean
+}
 
 export default function ResumePreviewPage() {
     const router = useRouter()
     const [formData, setFormData] = useState<ResumeData | null>(null)
 
     useEffect(() => {
-        const previewResumeId = localStorage.getItem("previewResumeId")
-        const savedResumes = JSON.parse(localStorage.getItem("savedResumes") || "[]")
+        const timer = window.setTimeout(() => {
+            const editingResumeId = localStorage.getItem("editingResumeId")
+            const saved = localStorage.getItem("resumeData")
 
-        if (previewResumeId) {
-            const targetResume = savedResumes.find(
-                (resume: any) => resume.id === previewResumeId
-            )
-
-            if (targetResume) {
-                setFormData(targetResume.data)
+            if (editingResumeId && saved) {
+                setFormData(JSON.parse(saved))
                 return
             }
-        }
 
-        const saved = localStorage.getItem("resumeData")
-        if (saved) setFormData(JSON.parse(saved))
+            const previewResumeId = localStorage.getItem("previewResumeId")
+            const savedResumes = JSON.parse(localStorage.getItem("savedResumes") || "[]") as SavedResume[]
+
+            if (previewResumeId) {
+                const targetResume = savedResumes.find(
+                    (resume) => resume.id === previewResumeId
+                )
+
+                if (targetResume) {
+                    setFormData(targetResume.data)
+                    return
+                }
+            }
+
+            if (saved) setFormData(JSON.parse(saved))
+        }, 0)
+
+        return () => window.clearTimeout(timer)
     }, [])
 
     const handleSaveResume = () => {
@@ -38,12 +107,12 @@ export default function ResumePreviewPage() {
 
         if (!ok) return
 
-        const savedResumes = JSON.parse(localStorage.getItem("savedResumes") || "[]")
+        const savedResumes = JSON.parse(localStorage.getItem("savedResumes") || "[]") as SavedResume[]
         const editingResumeId = localStorage.getItem("editingResumeId")
         const now = new Date().toISOString()
 
         if (editingResumeId) {
-            const updatedResumes = savedResumes.map((resume: any) =>
+            const updatedResumes = savedResumes.map((resume) =>
                 resume.id === editingResumeId
                     ? {
                         ...resume,
@@ -56,6 +125,7 @@ export default function ResumePreviewPage() {
 
             localStorage.setItem("savedResumes", JSON.stringify(updatedResumes))
             localStorage.removeItem("editingResumeId")
+            localStorage.removeItem("resumeBuilderMode")
         } else {
             const newResume = {
                 id: crypto.randomUUID(),
@@ -69,6 +139,8 @@ export default function ResumePreviewPage() {
             localStorage.setItem("savedResumes", JSON.stringify([newResume, ...savedResumes]))
         }
 
+        localStorage.removeItem("previewResumeId")
+        localStorage.removeItem("resumeData")
         router.push("/tools/mypage/save-builder-resume")
     }
 
@@ -157,10 +229,21 @@ export default function ResumePreviewPage() {
                                         {formData.email} · {formData.phone}
                                     </p>
                                 </div>
-
-                                <div className="text-xs text-slate-400">
-                                    이미지 없음
-                                </div>
+                                {formData.photoUrl ? (
+                                    <div className="relative h-36 w-28 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
+                                        <Image
+                                            src={formData.photoUrl}
+                                            alt="프로필 사진"
+                                            fill
+                                            unoptimized
+                                            className="object-cover"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="flex h-36 w-28 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-400">
+                                        이미지 없음
+                                    </div>
+                                )}
                             </div>
                         </section>
 
@@ -170,7 +253,7 @@ export default function ResumePreviewPage() {
                             {formData.education?.length === 0 ? (
                                 <p className="text-sm text-slate-400">입력된 학력이 없습니다.</p>
                             ) : (
-                                formData.education?.map((edu: any, index: number) => (
+                                formData.education?.map((edu, index) => (
                                     <div key={index} className="mb-4">
                                         <div className="font-bold">
                                             {edu.schoolName}
@@ -191,7 +274,7 @@ export default function ResumePreviewPage() {
                             {formData.career?.length === 0 ? (
                                 <p className="text-sm text-slate-400">입력된 경력이 없습니다.</p>
                             ) : (
-                                formData.career?.map((career: any, index: number) => (
+                                formData.career?.map((career, index) => (
                                     <div key={index} className="mb-4">
                                         <div className="font-bold">
                                             {career.companyName}
@@ -212,7 +295,7 @@ export default function ResumePreviewPage() {
                             {formData.skillGroups?.length === 0 ? (
                                 <p className="text-sm text-slate-400">입력된 기술이 없습니다.</p>
                             ) : (
-                                formData.skillGroups?.map((group: any, index: number) => (
+                                formData.skillGroups?.map((group, index) => (
                                     <div key={index} className="mb-4">
                                         <div className="font-bold">{group.category}</div>
                                         <div className="mt-2 flex flex-wrap gap-2">
@@ -233,7 +316,7 @@ export default function ResumePreviewPage() {
                             {formData.certificates?.length === 0 ? (
                                 <p className="text-sm text-slate-400">입력된 자격증이 없습니다.</p>
                             ) : (
-                                formData.certificates?.map((cert: any, index: number) => (
+                                formData.certificates?.map((cert, index) => (
                                     <div key={index} className="mb-4">
                                         <div className="font-bold">
                                             {cert.name}
@@ -258,7 +341,7 @@ export default function ResumePreviewPage() {
                             {formData.awards?.length === 0 ? (
                                 <p className="text-sm text-slate-400">입력된 수상경력이 없습니다.</p>
                             ) : (
-                                formData.awards?.map((award: any, index: number) => (
+                                formData.awards?.map((award, index) => (
                                     <div key={index} className="mb-4">
                                         <div className="font-bold">
                                             {award.title}

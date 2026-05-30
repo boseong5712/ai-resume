@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
@@ -17,8 +17,6 @@ import {
     Smartphone,
     Database,
     Cloud,
-    Gamepad2,
-    Shield,
     Palette,
     Bug,
     FolderKanban,
@@ -29,18 +27,7 @@ import {
     Scale,
     Factory,
     Truck,
-    HeartPulse,
-    BookOpen,
-    Clapperboard,
-    Headphones,
-    Landmark,
-    Home,
     Sparkles,
-    Dumbbell,
-    Languages,
-    Music,
-    Leaf,
-    Cpu,
     Info,
     X,
     Save,
@@ -68,7 +55,7 @@ const SCHOOL_OPTIONS = [
     "경희대학교",
     "부산대학교",
     "동아대학교",
-    "동의대학교",
+    "숭실대학교",
 ]
 
 const MAJOR_OPTIONS = [
@@ -80,40 +67,9 @@ const MAJOR_OPTIONS = [
     "경제학과",
 ]
 
-const DEGREE_OPTIONS = [
-    "고등학교졸업",
-    "전문학사",
-    "학사",
-    "석사",
-    "박사",
-]
-
-const STATUS_OPTIONS = [
-    "졸업",
-    "졸업예정",
-    "재학중",
-    "수료",
-    "중퇴",
-]
-
-const COMPANY_OPTIONS = [
-    "삼성전자",
-    "LG전자",
-    "네이버",
-    "카카오",
-    "쿠팡",
-    "배달의민족",
-    "토스",
-    "라인",
-    "SK하이닉스",
-    "현대자동차",
-    "CJ올리브영",
-    "당근",
-    "야놀자",
-    "직방",
-    "우아한형제들",
-]
-
+const DEGREE_OPTIONS = ["고등학교졸업", "전문학사", "학사", "석사", "박사"]
+const STATUS_OPTIONS = ["졸업", "졸업예정", "재학중", "수료", "중퇴"]
+const COMPANY_OPTIONS = ["삼성전자", "LG전자", "네이버", "카카오", "쿠팡", "배달의민족", "토스", "라인", "SK하이닉스", "현대자동차", "CJ올리브영", "당근", "오늘의집", "직방", "우아한형제들"]
 const GPA_SCALE_OPTIONS = ["4.0", "4.3", "4.5", "100"]
 
 type EducationItem = {
@@ -142,6 +98,12 @@ type SkillGroupItem = {
     skills: string[]
 }
 
+type ValidationResult = {
+    ok: boolean
+    message?: string
+    tab?: string
+}
+
 type CertificateItem = {
     name: string
     issuer: string
@@ -159,153 +121,36 @@ type AwardItem = {
 }
 
 const SKILL_CATEGORIES = [
-    {
-        group: "웹/앱 개발",
-        icon: Code2,
-        items: ["프론트엔드", "백엔드", "풀스택"],
-    },
-    {
-        group: "모바일 개발",
-        icon: Smartphone,
-        items: ["모바일 - 네이티브", "모바일 - 크로스플랫폼", "모바일 - 하이브리드"],
-    },
-    {
-        group: "데이터 & AI",
-        icon: Database,
-        items: ["데이터베이스", "데이터 엔지니어링", "데이터 분석", "머신러닝/AI", "빅데이터"],
-    },
-    {
-        group: "인프라 & 클라우드",
-        icon: Cloud,
-        items: ["클라우드 서비스", "데브옵스/CI/CD", "인프라/서버", "컨테이너/오케스트레이션"],
-    },
-    {
-        group: "프로그래밍",
-        icon: Code2,
-        items: ["프로그래밍 언어", "스크립트 언어", "Web Assembly"],
-    },
-    {
-        group: "게임 & 멀티미디어",
-        icon: Gamepad2,
-        items: ["게임 엔진", "게임 개발", "VR/AR"],
-    },
-    {
-        group: "보안 & 블록체인",
-        icon: Shield,
-        items: ["보안", "블록체인", "암호화"],
-    },
-    {
-        group: "디자인 & 크리에이티브",
-        icon: Palette,
-        items: ["UI/UX 디자인", "그래픽 디자인", "3D/모델링", "영상/애니메이션", "웹디자인", "브랜드 디자인"],
-    },
-    {
-        group: "테스트 & 품질관리",
-        icon: Bug,
-        items: ["테스트/QA", "성능 최적화", "모니터링/로깅"],
-    },
-    {
-        group: "협업 & 관리도구",
-        icon: FolderKanban,
-        items: ["프로젝트 관리", "협업 도구", "문서화 도구", "버전 관리"],
-    },
-    {
-        group: "마케팅 & 광고",
-        icon: Megaphone,
-        items: ["디지털 마케팅", "SNS 마케팅", "콘텐츠 마케팅", "퍼포먼스 마케팅", "브랜드 마케팅", "CRM/이메일 마케팅"],
-    },
-    {
-        group: "영업 & 세일즈",
-        icon: Handshake,
-        items: ["B2B 영업", "B2C 영업", "온라인 영업", "텔레세일즈", "영업 관리", "고객 관리"],
-    },
-    {
-        group: "인사 & HR",
-        icon: Users,
-        items: ["채용/리크루팅", "인사 관리", "교육/연수", "급여/복리후생", "노무/법무", "조직 개발"],
-    },
-    {
-        group: "재무 & 회계",
-        icon: Calculator,
-        items: ["회계", "세무", "재무 분석", "예산 관리", "투자 분석", "IR/공시"],
-    },
-    {
-        group: "법무 & 컨설팅",
-        icon: Scale,
-        items: ["계약/법무", "지적재산권", "규제/컴플라이언스", "경영 컨설팅", "전략 기획"],
-    },
-    {
-        group: "제조 & 생산",
-        icon: Factory,
-        items: ["생산 관리", "품질 관리", "공정 개선", "설비 관리", "안전 관리", "SCM/구매"],
-    },
-    {
-        group: "물류 & SCM",
-        icon: Truck,
-        items: ["물류 관리", "재고 관리", "운송 관리", "창고 관리", "수출입", "유통"],
-    },
-    {
-        group: "의료 & 헬스케어",
-        icon: HeartPulse,
-        items: ["의료 서비스", "간호", "약학", "의료 기기", "헬스케어 IT", "의료 연구"],
-    },
-    {
-        group: "교육 & 강의",
-        icon: BookOpen,
-        items: ["강의/교육", "교육과정 개발", "e-러닝", "교육 컨설팅", "학습 설계"],
-    },
-    {
-        group: "미디어 & 콘텐츠",
-        icon: Clapperboard,
-        items: ["콘텐츠 제작", "방송/영상", "출판/편집", "카피라이팅"],
-    },
-    {
-        group: "서비스업",
-        icon: Headphones,
-        items: ["고객 서비스", "호텔/숙박", "외식/F&B", "여행/관광", "이벤트 기획"],
-    },
-    {
-        group: "금융 & 투자",
-        icon: Landmark,
-        items: ["은행/금융", "보험", "증권/투자", "핀테크", "자산 관리", "대출/신용"],
-    },
-    {
-        group: "부동산",
-        icon: Home,
-        items: ["부동산 중개", "부동산 개발", "시설 관리", "건설/시공", "인테리어"],
-    },
-    {
-        group: "뷰티 & 패션",
-        icon: Sparkles,
-        items: ["뷰티/화장품", "패션 디자인", "스타일링", "헤어/네일", "패션 머천다이징"],
-    },
-    {
-        group: "스포츠 & 피트니스",
-        icon: Dumbbell,
-        items: ["피트니스 트레이닝", "스포츠 지도", "재활/물리치료", "스포츠 마케팅"],
-    },
-    {
-        group: "언어 & 국제",
-        icon: Languages,
-        items: ["번역/통역", "어학 교육", "국제 업무", "해외 진출"],
-    },
-    {
-        group: "예술 & 문화",
-        icon: Music,
-        items: ["공연/연기", "음악", "미술", "문화 기획", "박물관/갤러리"],
-    },
-    {
-        group: "농업 & 환경",
-        icon: Leaf,
-        items: ["농업/원예", "환경 관리", "에너지", "지속가능성", "친환경"],
-    },
-    {
-        group: "기타 전문분야",
-        icon: Cpu,
-        items: ["IoT/임베디드", "네트워킹", "시스템 프로그래밍", "자동화/스크립팅", "기타"],
-    },
+    { group: "개발", icon: Code2, items: ["프론트엔드", "백엔드", "풀스택"] },
+    { group: "모바일", icon: Smartphone, items: ["iOS", "Android", "크로스플랫폼"] },
+    { group: "데이터", icon: Database, items: ["데이터베이스", "데이터 분석", "머신러닝/AI"] },
+    { group: "인프라", icon: Cloud, items: ["클라우드", "DevOps/CI/CD", "서버/네트워크"] },
+    { group: "디자인", icon: Palette, items: ["UI/UX", "그래픽 디자인", "브랜드 디자인"] },
+    { group: "테스트", icon: Bug, items: ["QA", "테스트 자동화", "성능 최적화"] },
+    { group: "협업", icon: FolderKanban, items: ["프로젝트 관리", "문서화", "버전 관리"] },
+    { group: "마케팅", icon: Megaphone, items: ["디지털 마케팅", "콘텐츠 마케팅", "CRM"] },
+    { group: "영업", icon: Handshake, items: ["B2B 영업", "B2C 영업", "고객 관리"] },
+    { group: "인사", icon: Users, items: ["채용", "인사 관리", "교육/연수"] },
+    { group: "재무", icon: Calculator, items: ["회계", "세무", "재무 분석"] },
+    { group: "법무", icon: Scale, items: ["계약/법무", "컴플라이언스", "전략 기획"] },
+    { group: "제조", icon: Factory, items: ["생산 관리", "품질 관리", "공정 개선"] },
+    { group: "물류", icon: Truck, items: ["물류 관리", "재고 관리", "SCM"] },
 ]
 
+const SKILL_SEARCH_ITEMS = [
+    { category: "프론트엔드", skills: ["HTML", "CSS", "JavaScript", "TypeScript", "React", "Next.js", "Vue.js", "Nuxt.js", "Svelte", "Tailwind CSS", "Redux", "Zustand", "React Query", "Webpack", "Vite"] },
+    { category: "백엔드", skills: ["Node.js", "Express", "NestJS", "Java", "Spring", "Spring Boot", "Kotlin", "Python", "Django", "FastAPI", "Flask", "PHP", "Laravel", "Go", "GraphQL", "REST API"] },
+    { category: "데이터베이스", skills: ["MySQL", "PostgreSQL", "MongoDB", "Redis", "Oracle", "MariaDB", "SQLite", "DynamoDB", "Elasticsearch", "Firebase", "Supabase"] },
+    { category: "데이터/AI", skills: ["Python", "Pandas", "NumPy", "TensorFlow", "PyTorch", "Scikit-learn", "R", "SQL", "Tableau", "Power BI", "머신러닝", "딥러닝", "데이터 분석"] },
+    { category: "인프라/클라우드", skills: ["AWS", "GCP", "Azure", "Docker", "Kubernetes", "Nginx", "Linux", "GitHub Actions", "Jenkins", "Terraform", "CI/CD", "Vercel", "Netlify"] },
+    { category: "모바일", skills: ["React Native", "Flutter", "Swift", "Kotlin", "Android", "iOS", "Dart", "Expo"] },
+    { category: "디자인", skills: ["Figma", "Adobe XD", "Photoshop", "Illustrator", "UI/UX", "디자인 시스템", "프로토타이핑"] },
+    { category: "협업/도구", skills: ["Git", "GitHub", "GitLab", "Jira", "Notion", "Slack", "Confluence", "Figma", "Agile", "Scrum"] },
+]
+
+const ALL_SKILL_ITEMS = Array.from(new Set(SKILL_SEARCH_ITEMS.flatMap((group) => group.skills))).sort((a, b) =>
+    a.localeCompare(b)
+)
 function AutoCompleteInput({
     label,
     placeholder,
@@ -385,6 +230,8 @@ export default function ResumeBuilderPage() {
         name: "",
         email: "",
         phone: "",
+        address: "",
+        birthDate: "",
         school: "",
         company: "",
         photoUrl: "",
@@ -412,36 +259,6 @@ export default function ResumeBuilderPage() {
     const [previewModalOpen, setPreviewModalOpen] = useState(false)
 
     useEffect(() => {
-        const editingResumeId = localStorage.getItem("editingResumeId")
-        const savedResumes = JSON.parse(localStorage.getItem("savedResumes") || "[]")
-
-        if (editingResumeId) {
-            const targetResume = savedResumes.find(
-                (resume: any) => resume.id === editingResumeId
-            )
-
-            if (targetResume) {
-                setFormData(targetResume.data)
-                setIsMounted(true)
-                return
-            }
-        }
-
-        const saved = localStorage.getItem("resumeData")
-
-        if (saved) {
-            setFormData(JSON.parse(saved))
-        }
-
-        setIsMounted(true)
-    }, [])
-
-    useEffect(() => {
-        if (!isMounted) return
-        localStorage.setItem("resumeData", JSON.stringify(formData))
-    }, [formData, isMounted])
-
-    useEffect(() => {
         const handleUnload = () => {
             localStorage.removeItem("resumeData")
             localStorage.removeItem("savedResume")
@@ -461,47 +278,47 @@ export default function ResumeBuilderPage() {
 
         // 기본정보 최대 50
         if (formData.resumeTitle?.trim()) score += 10
-        if (formData.name.trim()) score += 15
-        if (formData.email.trim()) score += 15
-        if (formData.phone.trim()) score += 10
+        if (formData.name?.trim()) score += 15
+        if (formData.email?.trim()) score += 15
+        if (formData.phone?.trim()) score += 10
 
         // 학력 최대 40
         formData.education.forEach((edu) => {
-            if (edu.schoolName.trim()) score += 10
-            if (edu.major.trim()) score += 10
-            if (edu.degree.trim()) score += 5
-            if (edu.status.trim()) score += 5
-            if (edu.admissionDate.trim()) score += 5
-            if (edu.graduationDate.trim()) score += 5
+            if (edu.schoolName?.trim()) score += 10
+            if (edu.major?.trim()) score += 10
+            if (edu.degree?.trim()) score += 5
+            if (edu.status?.trim()) score += 5
+            if (edu.admissionDate?.trim()) score += 5
+            if (edu.graduationDate?.trim()) score += 5
         })
 
         // 경력 최대 40
         formData.career.forEach((career) => {
-            if (career.companyName.trim()) score += 10
-            if (career.position.trim()) score += 10
-            if (career.startDate.trim()) score += 5
-            if (career.endDate.trim() || career.isCurrent) score += 5
-            if (career.description.trim()) score += 10
+            if (career.companyName?.trim()) score += 10
+            if (career.position?.trim()) score += 10
+            if (career.startDate?.trim()) score += 5
+            if (career.endDate?.trim() || career.isCurrent) score += 5
+            if (career.description?.trim()) score += 10
         })
 
         // 보유기술 최대 40
         formData.skillGroups.forEach((group) => {
-            if (group.category.trim()) score += 15
+            if (group.category?.trim()) score += 15
             if (group.skills.length > 0) score += 25
         })
 
         // 자격증 최대 15
         formData.certificates.forEach((cert) => {
-            if (cert.name.trim()) score += 5
-            if (cert.issuer.trim()) score += 5
-            if (cert.acquiredDate.trim()) score += 5
+            if (cert.name?.trim()) score += 5
+            if (cert.issuer?.trim()) score += 5
+            if (cert.acquiredDate?.trim()) score += 5
         })
 
         // 수상경력 최대 15
         formData.awards.forEach((award) => {
-            if (award.title.trim()) score += 5
-            if (award.organization.trim()) score += 5
-            if (award.date.trim()) score += 5
+            if (award.title?.trim()) score += 5
+            if (award.organization?.trim()) score += 5
+            if (award.date?.trim()) score += 5
         })
 
         return Math.min(score, 200)
@@ -562,6 +379,97 @@ export default function ResumeBuilderPage() {
         description: "",
         date: "",
     })
+
+    const normalizeFormData = useCallback((
+        data?: Partial<typeof defaultFormData> | null
+    ): typeof defaultFormData => ({
+        resumeTitle: data?.resumeTitle ?? "",
+        name: data?.name ?? "",
+        email: data?.email ?? "",
+        phone: data?.phone ?? "",
+        address: data?.address ?? "",
+        birthDate: data?.birthDate ?? "",
+        school: data?.school ?? "",
+        company: data?.company ?? "",
+        photoUrl: data?.photoUrl ?? "",
+        skills: data?.skills ?? [],
+        education: (data?.education ?? []).map((edu) => ({
+            schoolName: "",
+            major: "",
+            degree: "학사",
+            status: "졸업",
+            gpa: "",
+            gpaScale: "4.3",
+            admissionDate: "",
+            graduationDate: "",
+            extraInfo: "",
+            ...edu,
+        })),
+        career: (data?.career ?? []).map((career) => ({
+            companyName: "",
+            position: "",
+            startDate: "",
+            endDate: "",
+            isCurrent: false,
+            description: "",
+            ...career,
+        })),
+        skillGroups: (data?.skillGroups ?? []).map((group) => ({
+            category: "",
+            skills: [],
+            ...group,
+            skills: group.skills ?? [],
+        })),
+        certificates: (data?.certificates ?? []).map((cert) => ({
+            name: "",
+            issuer: "",
+            grade: "",
+            acquiredDate: "",
+            expiryDate: "",
+            noExpiry: false,
+            ...cert,
+        })),
+        awards: (data?.awards ?? []).map((award) => ({
+            title: "",
+            organization: "",
+            description: "",
+            date: "",
+            ...award,
+        })),
+    }), [])
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            const editingResumeId = localStorage.getItem("editingResumeId")
+            const savedResumes = JSON.parse(localStorage.getItem("savedResumes") || "[]") as Array<{
+                id: string
+                data: typeof defaultFormData
+            }>
+
+            if (editingResumeId) {
+                const targetResume = savedResumes.find(
+                    (resume) => resume.id === editingResumeId
+                )
+
+                if (targetResume) {
+                    setFormData(normalizeFormData(targetResume.data))
+                    localStorage.setItem("resumeBuilderMode", "edit")
+                    localStorage.removeItem("previewResumeId")
+                    setIsMounted(true)
+                    return
+                }
+            }
+
+            localStorage.removeItem("editingResumeId")
+            localStorage.removeItem("resumeBuilderMode")
+            localStorage.removeItem("resumeData")
+            localStorage.removeItem("savedResume")
+
+            setIsMounted(true)
+        }, 0)
+
+        return () => window.clearTimeout(timer)
+    }, [normalizeFormData])
 
     const updateEducationField = (
         index: number,
@@ -657,6 +565,16 @@ export default function ResumeBuilderPage() {
         (section) => section.items.length > 0 || skillModalSearch.trim() === ""
     )
 
+    const selectedSkillSearchGroup =
+        selectedSkillSearchGroupIndex === null ? null : formData.skillGroups[selectedSkillSearchGroupIndex]
+    const selectedSkillSearchCategory = selectedSkillSearchGroup?.category || ""
+    const currentCategorySkills =
+        SKILL_SEARCH_ITEMS.find((group) => group.category === selectedSkillSearchCategory)?.skills || []
+    const skillSearchPool = currentCategorySkills.length > 0 ? currentCategorySkills : ALL_SKILL_ITEMS
+    const filteredSkillSearchResults = skillSearchPool
+        .filter((skill) => skill.toLowerCase().includes(skillSearchKeyword.trim().toLowerCase()))
+        .slice(0, 80)
+
     const openSkillSearchModal = (index: number) => {
         setSelectedSkillSearchGroupIndex(index)
         setSkillModalOpen(false)
@@ -703,6 +621,50 @@ export default function ResumeBuilderPage() {
         addSkillToGroup(selectedSkillSearchGroupIndex, value)
         setSkillSearchKeyword("")
         setSkillSearchModalOpen(false)
+    }
+
+    const validateRequiredFields = (): ValidationResult => {
+        if (!formData.name.trim()) return { ok: false, tab: tabs[0], message: "기본정보의 이름을 입력해주세요." }
+        if (!formData.email.trim()) return { ok: false, tab: tabs[0], message: "기본정보의 이메일을 입력해주세요." }
+        if (!formData.phone.trim()) return { ok: false, tab: tabs[0], message: "기본정보의 전화번호를 입력해주세요." }
+        if (!formData.birthDate.trim()) return { ok: false, tab: tabs[0], message: "기본정보의 생년월일을 입력해주세요." }
+
+        for (let index = 0; index < formData.education.length; index += 1) {
+            const edu = formData.education[index]
+            if (!edu.schoolName.trim()) return { ok: false, tab: tabs[1], message: `학력사항 ${index + 1}의 학교명을 입력해주세요.` }
+            if (!edu.major.trim()) return { ok: false, tab: tabs[1], message: `학력사항 ${index + 1}의 전공을 입력해주세요.` }
+            if (!edu.admissionDate.trim()) return { ok: false, tab: tabs[1], message: `학력사항 ${index + 1}의 입학일을 입력해주세요.` }
+        }
+
+        for (let index = 0; index < formData.career.length; index += 1) {
+            const career = formData.career[index]
+            if (!career.companyName.trim()) return { ok: false, tab: tabs[2], message: `경력사항 ${index + 1}의 회사명을 입력해주세요.` }
+            if (!career.position.trim()) return { ok: false, tab: tabs[2], message: `경력사항 ${index + 1}의 직책을 입력해주세요.` }
+            if (!career.startDate.trim()) return { ok: false, tab: tabs[2], message: `경력사항 ${index + 1}의 시작일을 입력해주세요.` }
+        }
+
+        for (let index = 0; index < formData.skillGroups.length; index += 1) {
+            const group = formData.skillGroups[index]
+            if (!group.category.trim()) return { ok: false, tab: tabs[3], message: `보유기술 ${index + 1}의 카테고리를 선택해주세요.` }
+            if (group.skills.length === 0) return { ok: false, tab: tabs[3], message: `보유기술 ${index + 1}의 스킬 목록을 1개 이상 추가해주세요.` }
+        }
+
+        for (let index = 0; index < formData.certificates.length; index += 1) {
+            const cert = formData.certificates[index]
+            if (!cert.name.trim()) return { ok: false, tab: tabs[4], message: `자격증 ${index + 1}의 자격증명을 입력해주세요.` }
+            if (!cert.acquiredDate.trim()) return { ok: false, tab: tabs[4], message: `자격증 ${index + 1}의 취득일을 입력해주세요.` }
+        }
+
+        return { ok: true }
+    }
+
+    const alertRequiredFields = () => {
+        const result = validateRequiredFields()
+        if (result.ok) return true
+
+        if (result.tab) setActiveTab(result.tab)
+        window.alert(result.message || "필수 입력 항목을 작성해주세요.")
+        return false
     }
 
     const updateCertificateField = (
@@ -762,11 +724,12 @@ export default function ResumeBuilderPage() {
     }
 
     const goNextStep = () => {
+        if (!alertRequiredFields()) return
         if (!isLastStep) setActiveTab(tabs[currentStep + 1])
     }
 
     const handleTempSave = () => {
-        localStorage.setItem("resumeData", JSON.stringify(formData))
+        localStorage.removeItem("resumeData")
         alert("임시저장되었습니다.")
     }
 
@@ -791,12 +754,17 @@ export default function ResumeBuilderPage() {
     }
 
     const confirmPreview = () => {
+        if (!alertRequiredFields()) return
+
         localStorage.setItem("resumeData", JSON.stringify(formData))
+        localStorage.removeItem("previewResumeId")
         setPreviewModalOpen(false)
         router.push("/tools/resume-builder/preview")
     }
 
     const handleSaveResume = () => {
+        if (!alertRequiredFields()) return
+
         const ok = window.confirm(
             "이력서를 저장하시겠습니까?\n저장 후에도 언제든지 수정할 수 있습니다."
         )
@@ -812,7 +780,7 @@ export default function ResumeBuilderPage() {
         const now = new Date().toISOString()
 
         if (editingResumeId) {
-            const updatedResumes = savedResumes.map((resume: any) =>
+            const updatedResumes = savedResumes.map((resume: { id: string }) =>
                 resume.id === editingResumeId
                     ? {
                         ...resume,
@@ -931,7 +899,7 @@ export default function ResumeBuilderPage() {
                         {progress >= 100 && (
                             <div className="mt-5 flex items-center gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white">
-                                    🎉
+                                    ✓
                                 </div>
 
                                 <div>
@@ -1010,7 +978,7 @@ export default function ResumeBuilderPage() {
                                         <Input
                                             className="mt-2"
                                             placeholder="이름을 입력하세요"
-                                            value={formData.name}
+                                            value={formData.name ?? ""}
                                             onChange={(e) =>
                                                 setFormData({ ...formData, name: e.target.value })
                                             }
@@ -1022,7 +990,7 @@ export default function ResumeBuilderPage() {
                                         <Input
                                             className="mt-2"
                                             placeholder="이메일을 입력하세요"
-                                            value={formData.email}
+                                            value={formData.email ?? ""}
                                             onChange={(e) =>
                                                 setFormData({ ...formData, email: e.target.value })
                                             }
@@ -1034,7 +1002,7 @@ export default function ResumeBuilderPage() {
                                         <Input
                                             className="mt-2"
                                             placeholder="전화번호를 입력하세요"
-                                            value={formData.phone}
+                                            value={formData.phone ?? ""}
                                             onChange={(e) =>
                                                 setFormData({ ...formData, phone: e.target.value })
                                             }
@@ -1043,12 +1011,26 @@ export default function ResumeBuilderPage() {
 
                                     <div>
                                         <label className="text-sm font-medium">주소</label>
-                                        <Input className="mt-2" placeholder="주소를 입력하세요" />
+                                        <Input
+                                            className="mt-2"
+                                            placeholder="주소를 입력하세요"
+                                            value={formData.address ?? ""}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, address: e.target.value })
+                                            }
+                                        />
                                     </div>
 
                                     <div>
                                         <label className="text-sm font-medium">생년월일 *</label>
-                                        <Input className="mt-2" type="date" />
+                                        <Input
+                                            className="mt-2"
+                                            type="date"
+                                            value={formData.birthDate ?? ""}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, birthDate: e.target.value })
+                                            }
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -1065,7 +1047,7 @@ export default function ResumeBuilderPage() {
                                             </h3>
                                         </div>
                                         <p className="mt-2 text-sm text-slate-500">
-                                            학력사항을 시간순(최신순)으로 입력해주세요.
+                                            학력사항은 최신순 또는 시간순으로 입력해주세요.
                                         </p>
                                     </div>
 
@@ -1090,7 +1072,7 @@ export default function ResumeBuilderPage() {
                                                 >
                                                     <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="text-slate-400">⋮⋮</div>
+                                                             <div className="text-slate-400">📘</div>
                                                             <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                                                                 <GraduationCap className="h-4 w-4 text-sky-500" />
                                                                 학력 {index + 1}
@@ -1290,7 +1272,7 @@ export default function ResumeBuilderPage() {
                                             </h3>
                                         </div>
                                         <p className="mt-2 text-sm text-slate-500">
-                                            경력사항을 시간순(최신순)으로 입력해주세요.
+                                            경력사항은 최신 경력부터 입력해주세요.
                                         </p>
                                     </div>
 
@@ -1316,7 +1298,7 @@ export default function ResumeBuilderPage() {
                                                     {/* 상단 헤더 */}
                                                     <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="text-slate-400">⋮⋮</div>
+                                                            <div className="text-slate-400">💼</div>
                                                             <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                                                                 <Briefcase className="h-4 w-4 text-blue-500" />
                                                                 경력 {index + 1}
@@ -1407,15 +1389,15 @@ export default function ResumeBuilderPage() {
 
                                                         <div>
                                                             <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-slate-700">
-                                                                <span className="text-blue-500">ⓘ</span>
+                                                                <span className="text-blue-500">✦</span>
                                                                 담당업무 및 성과
                                                             </div>
 
                                                             <textarea
                                                                 className="min-h-[110px] w-full rounded-md border border-slate-200 p-3 text-sm outline-none focus:ring-1 focus:ring-sky-500"
                                                                 placeholder={`주요 담당업무와 성과를 구체적으로 작성해주세요
-예) • 사용자 경험 개선으로 전환율 15% 향상
-• React 기반 웹 애플리케이션 개발 및 유지보수`}
+예: 사용자 경험 개선으로 전환율 15% 향상
+예: React 기반 웹 애플리케이션 개발 및 유지보수`}
                                                                 value={career.description}
                                                                 onChange={(e) =>
                                                                     updateCareerField(index, "description", e.target.value)
@@ -1450,7 +1432,7 @@ export default function ResumeBuilderPage() {
                                         <div className="flex items-center gap-2">
                                             <Wrench className="h-4 w-4 text-cyan-500" />
                                             <h3 className="text-2xl font-bold tracking-tight text-slate-800">
-                                                보유 기술
+                                                보유기술
                                             </h3>
                                         </div>
                                         <p className="mt-2 text-sm text-slate-500">
@@ -1489,7 +1471,7 @@ export default function ResumeBuilderPage() {
                                                 >
                                                     <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="text-slate-400">⋮⋮</div>
+                                                            <div className="text-slate-400">🛠</div>
                                                             <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                                                                 <Wrench className="h-4 w-4 text-cyan-500" />
                                                                 스킬 {index + 1}
@@ -1614,7 +1596,7 @@ export default function ResumeBuilderPage() {
                                                     아직 등록된 자격증이 없습니다
                                                 </p>
                                                 <p className="mt-2 text-sm text-slate-400">
-                                                    '자격증 추가' 버튼을 클릭하여 첫 번째 자격증을 등록해보세요
+                                                    자격증 추가 버튼을 클릭해 첫 번째 자격증을 등록해보세요
                                                 </p>
                                             </div>
 
@@ -1628,7 +1610,7 @@ export default function ResumeBuilderPage() {
                                         </div>
                                     )}
 
-                                    {/* 입력 카드들 */}
+                                    {/* 입력 카드 */}
                                     {formData.certificates.length > 0 && (
                                         <div className="space-y-5">
                                             {formData.certificates.map((cert, index) => (
@@ -1639,7 +1621,7 @@ export default function ResumeBuilderPage() {
                                                     {/* 상단 헤더 */}
                                                     <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="text-slate-400">⋮⋮</div>
+                                                            <div className="text-slate-400">🏅</div>
                                                             <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                                                                 <Award className="h-4 w-4 text-blue-500" />
                                                                 자격증 {index + 1}
@@ -1753,12 +1735,12 @@ export default function ResumeBuilderPage() {
                                                                             updateCertificateField(index, "noExpiry", !cert.noExpiry)
                                                                         }
                                                                     >
-                                                                        ∞ 평생유효
+                                                                        평생유효
                                                                     </button>
                                                                 </div>
 
                                                                 <p className="mt-2 text-xs text-slate-400">
-                                                                    평생유효한 자격증인 경우 만료일을 입력하지 않아도 됩니다
+                                                                    평생유효인 자격증은 만료일을 입력하지 않아도 됩니다.
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -1804,7 +1786,7 @@ export default function ResumeBuilderPage() {
                                                 </p>
 
                                                 <p className="mt-2 text-sm text-slate-400">
-                                                    '수상경력 추가' 버튼을 클릭하여 첫 번째 수상경력을 등록해보세요
+                                                    수상경력 추가 버튼을 클릭해 첫 번째 수상경력을 등록해보세요
                                                 </p>
                                             </div>
 
@@ -1829,7 +1811,7 @@ export default function ResumeBuilderPage() {
                                                     {/* 카드 헤더 */}
                                                     <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="text-slate-400">⋮⋮</div>
+                                                            <div className="text-slate-400">🏆</div>
 
                                                             <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                                                                 <Trophy className="h-4 w-4 text-blue-500" />
@@ -1851,12 +1833,12 @@ export default function ResumeBuilderPage() {
                                                         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                                                             <div>
                                                                 <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                    수상명
+                                                                    수상명 *
                                                                 </label>
 
                                                                 <Input
                                                                     className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                    placeholder="예: 대상, 우수논문상, 대통령상"
+                                                                    placeholder="예: 데이터 분석 공모전 대상"
                                                                     value={award.title}
                                                                     onChange={(e) =>
                                                                         updateAwardField(index, "title", e.target.value)
@@ -1866,7 +1848,7 @@ export default function ResumeBuilderPage() {
 
                                                             <div>
                                                                 <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                    수여기관
+                                                                    수여기관 *
                                                                 </label>
 
                                                                 <Input
@@ -1886,12 +1868,12 @@ export default function ResumeBuilderPage() {
 
                                                         <div>
                                                             <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                설명/비고 (선택)
+                                                                    설명/비고 (선택)
                                                             </label>
 
                                                             <Input
                                                                 className="h-11 border-slate-200 bg-white text-sm shadow-none focus-visible:ring-1 focus-visible:ring-sky-500"
-                                                                placeholder="예: 전국 1등, 최우수상, 금상"
+                                                                placeholder="예: 전국 1위, 최우수상, 금상"
                                                                 value={award.description}
                                                                 onChange={(e) =>
                                                                     updateAwardField(
@@ -1905,7 +1887,7 @@ export default function ResumeBuilderPage() {
 
                                                         <div className="max-w-xs">
                                                             <label className="mb-2 block text-[13px] font-semibold text-slate-700">
-                                                                수상일
+                                                                수상일 *
                                                             </label>
 
                                                             <Input
@@ -1991,12 +1973,12 @@ export default function ResumeBuilderPage() {
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40">
                     <div className="w-[420px] rounded-2xl bg-white p-6 shadow-2xl">
                         <div className="mb-4 flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">🚀</div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">✓</div>
                             <div className="text-lg font-bold">미리보기 및 완성하기</div>
                         </div>
 
                         <div className="mb-6 text-sm text-gray-500">
-                            🎉 이력서가 완성되었습니다!<br />
+                            이력서가 완성되었습니다.<br />
                             미리보기에서 최종 이력서를 확인하시겠습니까?
                         </div>
 
@@ -2081,7 +2063,7 @@ export default function ResumeBuilderPage() {
 
             {skillSearchModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-                    <div className="w-[500px] max-w-[92vw] overflow-hidden rounded-2xl bg-white shadow-2xl">
+                    <div className="max-h-[82vh] w-[500px] max-w-[92vw] overflow-hidden rounded-2xl bg-white shadow-2xl">
                         <div className="flex items-center justify-between border-b px-5 py-4">
                             <h4 className="text-[28px] font-bold text-slate-800">스킬 검색</h4>
                             <button
@@ -2098,34 +2080,56 @@ export default function ResumeBuilderPage() {
                                 <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
                                 <Input
                                     className="h-12 border-blue-400 pl-10 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-blue-500"
-                                    placeholder="스킬명 입력..."
+                                    placeholder="스킬명을 입력하세요"
                                     value={skillSearchKeyword}
                                     onChange={(e) => setSkillSearchKeyword(e.target.value)}
                                 />
                             </div>
                         </div>
 
-                        <div className="flex min-h-[240px] flex-col items-center justify-center px-5 py-10 text-center">
-                            <Info className="mb-4 h-14 w-14 text-slate-300" />
-
+                        <div className="max-h-[420px] min-h-[240px] overflow-y-auto px-5 py-5 pr-3">
                             {skillSearchKeyword.trim() === "" ? (
-                                <p className="text-lg font-semibold text-slate-700">
-                                    스킬을 검색해주세요
-                                </p>
-                            ) : (
-                                <>
-                                    <p className="text-lg font-semibold text-slate-700">
-                                        검색 결과가 없습니다
+                                <div className="flex min-h-[210px] flex-col items-center justify-center text-center">
+                                    <Info className="mb-4 h-14 w-14 text-slate-300" />
+                                    <p className="text-lg font-semibold text-slate-700">스킬을 검색해주세요</p>
+                                    {selectedSkillSearchCategory && (
+                                        <p className="mt-2 text-sm text-slate-400">현재 카테고리: {selectedSkillSearchCategory}</p>
+                                    )}
+                                </div>
+                            ) : filteredSkillSearchResults.length > 0 ? (
+                                <div className="space-y-2">
+                                    <p className="mb-3 text-sm font-semibold text-slate-500">
+                                        검색 결과 {filteredSkillSearchResults.length}개
                                     </p>
-
+                                    {filteredSkillSearchResults.map((skill) => (
+                                        <button
+                                            key={skill}
+                                            type="button"
+                                            onClick={() => {
+                                                if (selectedSkillSearchGroupIndex === null) return
+                                                addSkillToGroup(selectedSkillSearchGroupIndex, skill)
+                                                setSkillSearchKeyword("")
+                                                setSkillSearchModalOpen(false)
+                                            }}
+                                            className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50"
+                                        >
+                                            <span>{skill}</span>
+                                            <span className="text-blue-600">추가</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex min-h-[210px] flex-col items-center justify-center text-center">
+                                    <Info className="mb-4 h-14 w-14 text-slate-300" />
+                                    <p className="text-lg font-semibold text-slate-700">검색 결과가 없습니다</p>
                                     <button
                                         type="button"
                                         onClick={handleDirectAddSkill}
                                         className="mt-4 rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
                                     >
-                                        "{skillSearchKeyword}" 직접 추가
+                                        {skillSearchKeyword} 직접 추가
                                     </button>
-                                </>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -2134,3 +2138,6 @@ export default function ResumeBuilderPage() {
         </div>
     )
 }
+
+
+

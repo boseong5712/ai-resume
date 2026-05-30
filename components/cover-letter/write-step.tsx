@@ -23,6 +23,20 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import {
+    availableQuestions,
+    fallbackDetailAnswer,
+    generatedCoverLetter,
+    generatedDetailAnswers,
+    polishDirectionGroups,
+    polishOptions,
+    polishSubtitles,
+    questionDetails,
+    type PolishOptionId,
+    type QuestionType,
+} from "./constants"
+import type { AIAction, EssayItem, SavedCoverLetter } from "./types"
+import { countWithoutSpaces, createIntegratedFallback, downloadWordDocument } from "./utils"
 
 type CoverLetterWriteStepProps = {
     documentTitle?: string
@@ -69,167 +83,6 @@ const guideItems = [
         color: "bg-orange-500",
     },
 ]
-
-const questionDetails = {
-    "장단점에 관하여": [
-        "장점을 발휘했던 구체적인 경험을 알려주세요.",
-        "단점을 극복하기 위해 어떤 노력을 했나요?",
-        "장단점이 지원 직무와 어떤 연관이 있나요?",
-    ],
-    "지원동기에 관하여": [
-        "해당 회사를 선택한 구체적인 이유는 무엇인가요?",
-        "지원 직무에 관심을 갖게 된 계기는 무엇인가요?",
-        "회사의 어떤 점이 당신의 경력 목표와 부합하나요?",
-    ],
-    "입사 후 포부에 관하여": [
-        "입사 후 1년 내에 이루고 싶은 목표는 무엇인가요?",
-        "장기적으로 어떤 성장을 기대하시나요?",
-        "회사에 어떤 기여를 하고 싶으신가요?",
-    ],
-    "나의 가치관에 관하여": [
-        "일과 삶의 균형에 대해 어떻게 생각하시나요?",
-        "직장에서 가장 중요하게 생각하는 가치는 무엇인가요?",
-        "이러한 가치관이 형성된 계기는 무엇인가요?",
-    ],
-    "문제해결능력에 관하여": [
-        "어려운 문제를 해결했던 경험을 알려주세요.",
-        "문제 해결 과정에서 어떤 방법을 사용했나요?",
-        "그 경험을 통해 어떤 것을 배웠나요?",
-    ],
-    "의사소통능력에 관하여": [
-        "팀원들과의 의사소통 경험을 알려주세요.",
-        "의견 충돌이 있었을 때 어떻게 해결했나요?",
-        "효과적인 의사소통을 위해 어떤 노력을 했나요?",
-    ],
-    "팀워크와 리더십에 관하여": [
-        "팀 프로젝트에서의 역할과 성과를 알려주세요.",
-        "리더십을 발휘했던 경험이 있나요?",
-        "팀워크를 위해 어떤 노력을 했나요?",
-    ],
-    "자기주도적 태도에 관하여": [
-        "새로운 기술이나 지식을 습득한 경험을 알려주세요.",
-        "어려운 상황에서 어떻게 극복했나요?",
-        "자기계발을 위해 어떤 노력을 하고 있나요?",
-    ],
-} satisfies Record<string, string[]>
-
-type QuestionType = keyof typeof questionDetails
-
-const availableQuestions = Object.keys(questionDetails) as QuestionType[]
-
-const generatedDetailAnswers = [
-    "SK하이닉스에서 임원으로 재직하며, 짧은 시간 내에 성과 평가 시스템을 분석하고 개선 방안을 제시한 경험이 있습니다. 이 과정에서 HTML/CSS에 대한 이해를 바탕으로 데이터 시각화 도구를 활용하여 임원진에게 직관적인 보고서를 제공하였고, 이는 빠른 의사결정에 큰 도움이 되었습니다. 이러한 경험은 삼성전자의 기획·전략 컨설턴트로서 성과 평가 및 개선 방안을 효율적으로 제시하는 데 기여할 수 있습니다.",
-    "단점으로 지적받았던 것은 새로운 기술 트렌드에 대한 적응 속도였습니다. SK하이닉스에서 임원으로 재직하며, HTML/CSS와 같은 웹 기술의 중요성을 깨닫고 이를 보완하기 위해 관련 온라인 강좌를 수강하였습니다. 이러한 노력은 전략 기획의 디지털 전환 프로젝트에서 성과를 내는 데 큰 도움이 되었고, 삼성전자에서 컨설턴트로서 성과 평가 및 개선 방안 수립에 강점으로 작용할 것입니다.",
-    "삼성전자 기획·전략 컨설턴트 역할에 저의 강점과 약점이 어떻게 연관되는지 설명드리겠습니다. SK하이닉스에서 2개월 동안 임원으로 근무하면서 성과 평가 및 개선 방안을 제시한 경험은 저의 분석적 사고와 문제 해결 능력을 강화했습니다. 이는 기획 및 전략 분야에서 필수적인 역량이며, 제가 컨설턴트로서 가치 있는 통찰을 제공할 수 있는 기반이 됩니다.",
-]
-
-const fallbackDetailAnswer = "관련 경험과 배운 점을 바탕으로 지원 직무와 연결되는 구체적인 답변을 작성하겠습니다."
-
-const generatedCoverLetter = `저는 삼성전자의 기획•전략 컨설턴트 직무에 지원하며, 문제를 구조적으로 분석하고 실행 가능한 개선안을 제시하는 역량을 강점으로 삼고 있습니다. SK하이닉스에서 임원으로 근무하며 성과 평가 및 개선 방안을 검토했고, 정보처리기사 자격과 HTML/CSS 이해를 바탕으로 성과 지표를 더 명확하게 보여주는 방식을 고민했습니다. 단순히 수치를 나열하는 것이 아니라, 의사결정자가 빠르게 판단할 수 있도록 성과 흐름과 개선 포인트가 드러나는 구조를 만드는 데 집중했습니다. 이러한 경험은 삼성전자에서도 현장의 문제를 구체적으로 파악하고 실질적인 전략으로 연결하는 기반이 될 것입니다.
-
-그 과정에서 성과 측정의 정확도를 높이는 방향을 제안하며 데이터 기반 사고와 문제 해결력을 키웠습니다. 짧은 기간이었지만 제한된 정보 속에서도 우선순위를 정하고, 필요한 자료를 빠르게 정리해 실질적인 개선 방향으로 연결하는 경험을 쌓았습니다.
-
-반면 경력 기간이 길지 않다는 점은 보완해야 할 부분입니다. 이를 극복하기 위해 새로운 기술과 분석 방법을 꾸준히 학습하고 있으며, 삼성전자 컨설턴트 직무에서도 빠른 학습력과 전략적 사고를 바탕으로 현장의 문제를 명확히 파악하고 실행 가능한 전략을 제시하는 인재로 기여하겠습니다.`
-
-const polishOptions = [
-    { id: "human", icon: "😊", title: "인간미 첨가", description: "AI 티 제거, 자연스럽게" },
-    { id: "consistent", icon: "📐", title: "통일성 높이기", description: "일관된 문체와 흐름" },
-    { id: "professional", icon: "💼", title: "전문적으로", description: "비즈니스 톤으로" },
-    { id: "clear", icon: "🔍", title: "명확하게", description: "이해하기 쉽게" },
-    { id: "story", icon: "📖", title: "스토리텔링", description: "이야기처럼 구성" },
-]
-
-const humanizeDirections = [
-    { id: "natural", title: "자연스러운 표현", description: "딱딱한 문체를 부드럽게" },
-    { id: "personal", title: "개인적 경험 강조", description: "개인의 감정과 경험이 드러나게" },
-    { id: "emotion", title: "감정 표현 추가", description: "적절한 감정과 느낌 표현" },
-    { id: "story", title: "스토리텔링 강화", description: "이야기처럼 흥미롭게 구성" },
-    { id: "empathy", title: "공감대 형성", description: "읽는 사람이 공감할 수 있게" },
-]
-
-type EssayItem = {
-    id: number
-    question: string
-    details: string[]
-    answer: string
-}
-
-type SavedCoverLetter = {
-    id: string
-    title: string
-    company: string
-    job: string
-    careerType: string
-    keywords: string[]
-    tasks: string[]
-    experiences: string[]
-    situationSummary: string
-    items: EssayItem[]
-    integratedCoverLetter?: string
-    status: "saved" | "draft"
-    createdAt: string
-    updatedAt: string
-}
-
-type AIAction = "detail" | "draft" | "polish" | "integrate"
-
-function countWithoutSpaces(text: string) {
-    return text.replace(/\s/g, "").length
-}
-
-function createIntegratedFallback(items: EssayItem[]) {
-    const paragraphs: string[] = []
-    const seen = new Set<string>()
-
-    items
-        .filter((item) => item.answer.trim())
-        .forEach((item, itemIndex) => {
-            const answerParagraphs = item.answer
-                .split(/\n{2,}/)
-                .map((paragraph) => paragraph.trim())
-                .filter(Boolean)
-            const paragraphsToUse = itemIndex === 0 ? answerParagraphs : answerParagraphs.slice(1)
-
-            paragraphsToUse.forEach((paragraph) => {
-                const normalized = paragraph.replace(/\s/g, "")
-                if (!seen.has(normalized)) {
-                    seen.add(normalized)
-                    paragraphs.push(paragraph)
-                }
-            })
-        })
-
-    return paragraphs.join("\n\n")
-}
-
-function downloadWordDocument(title: string, content: string) {
-    const escapedTitle = title.replace(/[<>:"/\\|?*]/g, "").trim() || "자기소개서"
-    const html = `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8" />
-<title>${escapedTitle}</title>
-<style>
-body { font-family: Malgun Gothic, Apple SD Gothic Neo, Arial, sans-serif; line-height: 1.8; color: #111827; }
-h1 { font-size: 20px; margin-bottom: 24px; }
-p { margin: 0 0 16px; white-space: pre-wrap; }
-</style>
-</head>
-<body>
-<h1>${escapedTitle}</h1>
-${content.split(/\n{2,}/).map((paragraph) => `<p>${paragraph.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`).join("")}
-</body>
-</html>`
-    const blob = new Blob(["\ufeff", html], { type: "application/msword" })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement("a")
-    anchor.href = url
-    anchor.download = `${escapedTitle}.doc`
-    document.body.appendChild(anchor)
-    anchor.click()
-    anchor.remove()
-    URL.revokeObjectURL(url)
-}
 
 function SummaryItem({
     icon: Icon,
@@ -281,6 +134,7 @@ export function CoverLetterWriteStep({
     const [generatingItemId, setGeneratingItemId] = useState<number | null>(null)
     const [polishItemId, setPolishItemId] = useState<number | null>(null)
     const [humanizeItemId, setHumanizeItemId] = useState<number | null>(null)
+    const [selectedPolishOptionId, setSelectedPolishOptionId] = useState<PolishOptionId>("human")
     const [humanizeDirection, setHumanizeDirection] = useState("")
     const [humanizeRequest, setHumanizeRequest] = useState("")
     const [detailGeneratingIndex, setDetailGeneratingIndex] = useState<number | null>(null)
@@ -301,6 +155,8 @@ export function CoverLetterWriteStep({
     const detailItem = items.find((item) => item.id === detailItemId)
     const draftItem = items.find((item) => item.id === draftItemId)
     const humanizeItem = items.find((item) => item.id === humanizeItemId)
+    const selectedPolishOption = polishOptions.find((option) => option.id === selectedPolishOptionId) || polishOptions[0]
+    const selectedPolishDirections = polishDirectionGroups[selectedPolishOptionId]
     const getDetailPrompts = (question: string) =>
         questionDetails[question as QuestionType] || questionDetails["장단점에 관하여"]
 
@@ -512,9 +368,10 @@ export function CoverLetterWriteStep({
         )
     }
 
-    const openHumanizeModal = (id: number) => {
+    const openPolishModal = (id: number, optionId: PolishOptionId) => {
         setPolishItemId(null)
         setHumanizeItemId(id)
+        setSelectedPolishOptionId(optionId)
         setHumanizeDirection("")
         setHumanizeRequest("")
     }
@@ -541,25 +398,56 @@ export function CoverLetterWriteStep({
         if (!humanizeItem) return
 
         let revised = humanizeItem.answer || generatedCoverLetter
-        revised = revised
-            .replace("맡아온 경험을 가지고 있습니다.", "맡으며 직접 부딪치고 배운 경험이 있습니다.")
-            .replace("큰 도움이 될 것이라 확신합니다.", "삼성전자에서도 제 강점으로 이어질 것이라 믿습니다.")
-            .replace("강화하고자 합니다.", "한 단계 더 키워가고 싶습니다.")
-            .replace("가치 있는 통찰을 제공할 수 있는 기반이 됩니다.", "현장에서 실질적인 해답을 찾는 힘이 되었습니다.")
-            .replace("기여하고자 합니다.", "기여하고 싶습니다.")
-            .replace("인재가 되고자 합니다.", "구성원으로 성장하고 싶습니다.")
-
+        const selectedDirection = selectedPolishDirections.find((item) => item.id === humanizeDirection)
         const directionText: Record<string, string> = {
             natural: "짧은 경험이었지만, 숫자로 확인되는 변화를 만들어내는 과정은 제게 오래 남는 배움이 되었습니다.",
             personal: "처음에는 짧은 재직 기간이 약점처럼 느껴졌지만, 주어진 시간 안에 결과를 내기 위해 누구보다 치열하게 고민했습니다.",
             emotion: "개선안이 실제 성과로 이어지는 모습을 확인했을 때 느꼈던 보람은 지금도 새로운 도전을 선택하게 하는 원동력입니다.",
             story: "처음 업무를 맡았을 때 제 앞에 놓인 과제는 짧은 시간 안에 성과를 객관적으로 설명할 방법을 찾는 일이었습니다.",
             empathy: "성과 지표를 개선하는 일은 결국 함께 일하는 구성원들이 더 명확하게 방향을 이해하도록 돕는 일이라고 생각합니다.",
+            tone: "문장마다 다른 어조를 정돈해 지원자의 강점이 일관된 목소리로 전달되도록 다듬었습니다.",
+            tense: "경험 설명은 과거형으로, 포부와 기여 계획은 현재·미래형으로 정리해 흐름을 안정적으로 만들었습니다.",
+            terms: "반복되는 개념은 같은 용어로 통일해 읽는 사람이 핵심 역량을 더 쉽게 따라갈 수 있도록 했습니다.",
+            balance: "문단별 길이와 정보량을 조정해 도입, 경험, 마무리의 비중이 균형 있게 보이도록 다듬었습니다.",
+            logic: "문장 사이의 연결을 보강해 경험에서 배운 점과 지원 직무의 연관성이 자연스럽게 이어지도록 했습니다.",
+            business: "업무 맥락에 맞는 표현을 사용해 더 전문적이고 신뢰감 있는 비즈니스 톤으로 정리했습니다.",
+            results: "성과와 결과가 더 선명하게 드러나도록 행동과 변화의 흐름을 중심으로 표현을 강화했습니다.",
+            leadership: "주도적으로 판단하고 실행한 부분이 보이도록 리더십과 책임감을 드러내는 표현을 보강했습니다.",
+            competency: "직무 수행에 필요한 역량이 더 분명하게 전달되도록 경험과 기술을 업무 관점에서 정리했습니다.",
+            expertise: "해당 분야에 대한 이해와 전문성이 드러나도록 직무 관련 표현을 더 정교하게 다듬었습니다.",
+            simple: "복잡한 문장을 쉬운 표현으로 풀어 읽는 사람이 핵심 내용을 빠르게 이해할 수 있도록 했습니다.",
+            structure: "문장의 주어와 서술을 명확히 정리해 논리적인 구조로 읽히도록 개선했습니다.",
+            examples: "경험이 추상적으로 보이지 않도록 구체적인 상황과 행동을 중심으로 표현을 보강했습니다.",
+            remove: "중복되거나 장황한 표현을 줄여 핵심 메시지가 더 또렷하게 보이도록 정리했습니다.",
+            flow: "문단 사이의 연결 표현을 보강해 전체 흐름이 자연스럽게 이어지도록 다듬었습니다.",
+            narrative: "경험을 시작, 문제 인식, 실행, 결과의 흐름으로 재구성해 이야기처럼 읽히게 했습니다.",
+            scene: "상황과 배경이 더 생생하게 떠오르도록 경험의 맥락을 보강했습니다.",
+            conflict: "어려움과 해결 과정을 강조해 지원자의 문제 해결력이 더 잘 드러나도록 했습니다.",
+            growth: "경험 전후의 변화와 배운 점을 중심으로 성장 과정이 보이게 다듬었습니다.",
+            hook: "도입부에 관심을 끄는 문제 상황이나 강점을 배치해 첫인상을 강화했습니다.",
+        }
+
+        if (selectedPolishOptionId === "human") {
+            revised = revised
+                .replace("맡아온 경험을 가지고 있습니다.", "맡으며 직접 부딪치고 배운 경험이 있습니다.")
+                .replace("큰 도움이 될 것이라 확신합니다.", "삼성전자에서도 제 강점으로 이어질 것이라 믿습니다.")
+                .replace("강화하고자 합니다.", "한 단계 더 키워가고 싶습니다.")
+                .replace("가치 있는 통찰을 제공할 수 있는 기반이 됩니다.", "현장에서 실질적인 해답을 찾는 힘이 되었습니다.")
+                .replace("기여하고자 합니다.", "기여하고 싶습니다.")
+                .replace("인재가 되고자 합니다.", "구성원으로 성장하고 싶습니다.")
+        } else if (selectedPolishOptionId === "consistent") {
+            revised = revised.replace(/합니다\./g, "했습니다.").replace(/싶습니다\./g, "하겠습니다.")
+        } else if (selectedPolishOptionId === "professional") {
+            revised = revised.replace(/고민했습니다/g, "검토했습니다").replace(/도움이/g, "기여가")
+        } else if (selectedPolishOptionId === "clear") {
+            revised = revised.replace(/단순히/g, "단순히").replace(/기반이 될 것입니다/g, "기반이 됩니다")
+        } else if (selectedPolishOptionId === "story") {
+            revised = revised.replace(/^저는/m, "처음 이 경험을 마주했을 때, 저는")
         }
 
         const addition = humanizeRequest.trim()
             ? createCustomHumanizeAddition(humanizeRequest.trim())
-            : directionText[humanizeDirection]
+            : directionText[humanizeDirection] || (selectedDirection ? `${selectedDirection.title} 방향으로 문장과 흐름을 다듬었습니다.` : "")
         if (addition) {
             const firstBreak = revised.indexOf("\n\n", revised.indexOf("\n") + 1)
             revised = firstBreak >= 0
@@ -577,10 +465,15 @@ export function CoverLetterWriteStep({
 
         setPolishing(true)
         try {
-            const direction = humanizeDirections.find((item) => item.id === humanizeDirection)?.title
+            const direction = selectedPolishDirections.find((item) => item.id === humanizeDirection)
+            const polishDirection = [
+                selectedPolishOption.title,
+                selectedPolishOption.description,
+                direction ? `${direction.title}: ${direction.description}` : "",
+            ].filter(Boolean).join(" / ")
             const text = await requestAI("polish", {
                 text: humanizeItem.answer || generatedCoverLetter,
-                polishDirection: direction || "자연스럽고 따뜻한 표현으로 개선",
+                polishDirection,
                 customRequest: humanizeRequest.trim(),
             })
             updateItem(humanizeItem.id, { answer: text })
@@ -1019,7 +912,7 @@ export function CoverLetterWriteStep({
                                                     <button
                                                         key={option.id}
                                                         type="button"
-                                                        onClick={() => option.id === "human" && openHumanizeModal(item.id)}
+                                                        onClick={() => openPolishModal(item.id, option.id)}
                                                         className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-blue-50"
                                                     >
                                                         <span className="text-base">{option.icon}</span>
@@ -1246,14 +1139,16 @@ export function CoverLetterWriteStep({
                     <div className="flex max-h-[calc(100vh-30px)] w-full max-w-[610px] flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl">
                         <div className="flex items-start justify-between bg-[#2e68e9] px-8 py-6 text-white">
                             <div>
-                                <h2 className="text-[22px] font-bold">😊 인간미 첨가</h2>
+                                <h2 className="text-[22px] font-bold">
+                                    {selectedPolishOption.icon} {selectedPolishOption.title}
+                                </h2>
                                 <p className="mt-2 text-sm font-semibold text-blue-100">
-                                    AI 티를 제거하고 자연스럽고 따뜻한 표현으로 만들어드립니다
+                                    {polishSubtitles[selectedPolishOptionId]}
                                 </p>
                             </div>
                             <button
                                 type="button"
-                                aria-label="인간미 첨가 닫기"
+                                aria-label={`${selectedPolishOption.title} 닫기`}
                                 onClick={() => setHumanizeItemId(null)}
                                 className="rounded-lg border border-white/20 bg-white/10 p-3 text-white"
                             >
@@ -1263,7 +1158,7 @@ export function CoverLetterWriteStep({
                         <div className="flex-1 overflow-y-auto px-8 py-7">
                             <h3 className="mb-5 text-base font-bold text-slate-800">🎯 세부 개선 방향</h3>
                             <div className="space-y-4">
-                                {humanizeDirections.map((direction) => (
+                                {selectedPolishDirections.map((direction) => (
                                     <button
                                         key={direction.id}
                                         type="button"

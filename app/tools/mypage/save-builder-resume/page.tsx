@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 type SavedResume = {
     id: string
     title: string
-    data: any
+    data: unknown
     createdAt: string
     updatedAt: string
     isMain?: boolean
@@ -16,10 +16,16 @@ type SavedResume = {
 export default function SavedResumesPage() {
     const router = useRouter()
     const [resumes, setResumes] = useState<SavedResume[]>([])
+    const [nowTime, setNowTime] = useState(0)
 
     useEffect(() => {
-        const saved = JSON.parse(localStorage.getItem("savedResumes") || "[]")
-        setResumes(saved)
+        const timer = window.setTimeout(() => {
+            const saved = JSON.parse(localStorage.getItem("savedResumes") || "[]")
+            setResumes(saved)
+            setNowTime(Date.now())
+        }, 0)
+
+        return () => window.clearTimeout(timer)
     }, [])
 
     const saveResumes = (next: SavedResume[]) => {
@@ -29,7 +35,9 @@ export default function SavedResumesPage() {
 
     const handleEdit = (resume: SavedResume) => {
         localStorage.setItem("editingResumeId", resume.id)
-        localStorage.setItem("resumeData", JSON.stringify(resume.data))
+        localStorage.setItem("resumeBuilderMode", "edit")
+        localStorage.removeItem("previewResumeId")
+        localStorage.removeItem("resumeData")
         router.push("/tools/resume-builder")
     }
 
@@ -57,7 +65,7 @@ export default function SavedResumesPage() {
     }
 
     const getDateText = (date: string) => {
-        const diff = Date.now() - new Date(date).getTime()
+        const diff = (nowTime || new Date(date).getTime()) - new Date(date).getTime()
         const days = Math.floor(diff / (1000 * 60 * 60 * 24))
 
         if (days === 0) return "오늘"
@@ -89,6 +97,7 @@ export default function SavedResumesPage() {
                         type="button"
                         onClick={() => {
                             localStorage.removeItem("editingResumeId")
+                            localStorage.removeItem("resumeBuilderMode")
                             localStorage.removeItem("resumeData")
                             router.push("/tools/resume-builder")
                         }}
